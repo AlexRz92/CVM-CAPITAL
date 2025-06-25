@@ -12,7 +12,13 @@ interface AdministracionPanelProps {
 const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate }) => {
   const { admin } = useAdmin();
   const [activeSection, setActiveSection] = useState('resumen');
-  const [totalInversion, setTotalInversion] = useState(0);
+  const [estadisticas, setEstadisticas] = useState({
+    total_inversion: 0,
+    partners_activos: 0,
+    total_inversores: 0,
+    semana_actual: 1,
+    ganancia_semanal_actual: 0
+  });
   const [loading, setLoading] = useState(true);
   const [configForm, setConfigForm] = useState({
     semana_actual: '',
@@ -21,20 +27,26 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
   const [configLoading, setConfigLoading] = useState(false);
 
   useEffect(() => {
-    fetchTotalInversion();
+    fetchEstadisticas();
     if (activeSection === 'configuracion') {
       fetchConfiguracion();
     }
   }, [activeSection]);
 
-  const fetchTotalInversion = async () => {
+  const fetchEstadisticas = async () => {
     try {
-      const { data, error } = await supabase.rpc('calcular_total_inversion');
+      const { data, error } = await supabase.rpc('obtener_estadisticas_admin');
       
       if (error) throw error;
-      setTotalInversion(data || 0);
+      setEstadisticas(data || {
+        total_inversion: 0,
+        partners_activos: 0,
+        total_inversores: 0,
+        semana_actual: 1,
+        ganancia_semanal_actual: 0
+      });
     } catch (error) {
-      console.error('Error fetching total investment:', error);
+      console.error('Error fetching statistics:', error);
     } finally {
       setLoading(false);
     }
@@ -68,7 +80,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
     setConfigLoading(true);
 
     try {
-      const { data, error } = await supabase.rpc('configurar_semana', {
+      const { data, error } = await supabase.rpc('configurar_semana_sistema', {
         p_semana_numero: parseInt(configForm.semana_actual),
         p_fecha_inicio: configForm.fecha_inicio_semana,
         p_admin_id: admin?.id
@@ -77,10 +89,11 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
       if (error) throw error;
 
       alert('Configuración actualizada exitosamente');
+      fetchEstadisticas();
       onStatsUpdate();
     } catch (error) {
       console.error('Error updating configuration:', error);
-      alert('Error al actualizar la configuración');
+      alert('Error al actualizar la configuración: ' + (error as Error).message);
     } finally {
       setConfigLoading(false);
     }
@@ -135,7 +148,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
               <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-white/10 rounded-lg p-6 border border-white/20">
                 <div className="flex items-center justify-between mb-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center">
@@ -143,9 +156,9 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
                   </div>
                 </div>
                 <h4 className="text-white font-semibold mb-2">Total en Inversión</h4>
-                <p className="text-2xl font-bold text-green-300">{formatCurrency(totalInversion)}</p>
+                <p className="text-2xl font-bold text-green-300">{formatCurrency(estadisticas.total_inversion)}</p>
                 <p className="text-white/70 text-sm mt-2">
-                  Suma de todos los depósitos menos retiros
+                  Suma de inversores + partners
                 </p>
               </div>
 
@@ -156,22 +169,48 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
                   </div>
                 </div>
                 <h4 className="text-white font-semibold mb-2">Partners Activos</h4>
-                <p className="text-2xl font-bold text-blue-300">0</p>
+                <p className="text-2xl font-bold text-blue-300">{estadisticas.partners_activos}</p>
                 <p className="text-white/70 text-sm mt-2">
-                  Partners registrados en el sistema
+                  Partners registrados y activos
                 </p>
               </div>
 
               <div className="bg-white/10 rounded-lg p-6 border border-white/20">
                 <div className="flex items-center justify-between mb-4">
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-white" />
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <h4 className="text-white font-semibold mb-2">Total Inversores</h4>
+                <p className="text-2xl font-bold text-purple-300">{estadisticas.total_inversores}</p>
+                <p className="text-white/70 text-sm mt-2">
+                  Inversores registrados
+                </p>
+              </div>
+
+              <div className="bg-white/10 rounded-lg p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-white" />
                   </div>
                 </div>
                 <h4 className="text-white font-semibold mb-2">Semana Actual</h4>
-                <p className="text-2xl font-bold text-purple-300">1</p>
+                <p className="text-2xl font-bold text-yellow-300">{estadisticas.semana_actual}</p>
                 <p className="text-white/70 text-sm mt-2">
                   Período de ganancias actual
+                </p>
+              </div>
+
+              <div className="bg-white/10 rounded-lg p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <h4 className="text-white font-semibold mb-2">Ganancia Semanal</h4>
+                <p className="text-2xl font-bold text-cyan-300">{formatCurrency(estadisticas.ganancia_semanal_actual)}</p>
+                <p className="text-white/70 text-sm mt-2">
+                  Ganancia de la semana actual
                 </p>
               </div>
             </div>
@@ -180,14 +219,17 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
       )}
 
       {activeSection === 'partners' && (
-        <PartnersManager onUpdate={onStatsUpdate} />
+        <PartnersManager onUpdate={() => {
+          fetchEstadisticas();
+          onStatsUpdate();
+        }} />
       )}
 
       {activeSection === 'ganancias' && (
         <GananciasProcessor 
-          totalInversion={totalInversion} 
+          totalInversion={estadisticas.total_inversion} 
           onUpdate={() => {
-            fetchTotalInversion();
+            fetchEstadisticas();
             onStatsUpdate();
           }} 
         />
@@ -201,6 +243,25 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
               <Calendar className="w-6 h-6 mr-3" />
               Configuración de Semanas
             </h3>
+            
+            {/* Información actual */}
+            <div className="bg-white/10 rounded-lg p-4 border border-white/20 mb-6">
+              <h4 className="text-white font-semibold mb-3">Estado Actual</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-white/70 text-sm">Semana Actual</p>
+                  <p className="text-xl font-bold text-blue-300">{estadisticas.semana_actual}</p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-sm">Total Inversión</p>
+                  <p className="text-xl font-bold text-green-300">{formatCurrency(estadisticas.total_inversion)}</p>
+                </div>
+                <div>
+                  <p className="text-white/70 text-sm">Ganancia Semanal</p>
+                  <p className="text-xl font-bold text-yellow-300">{formatCurrency(estadisticas.ganancia_semanal_actual)}</p>
+                </div>
+              </div>
+            </div>
             
             <form onSubmit={handleConfigSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

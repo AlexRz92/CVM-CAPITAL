@@ -71,7 +71,7 @@ const Operaciones: React.FC = () => {
 
   const tabs = [
     { id: 'inversores', label: 'Inversores', icon: Users, count: stats.totalInversores },
-    { id: 'aprobaciones', label: 'Aprobaciones', icon: CheckCircle, count: stats.solicitudesPendientes },
+    { id: 'aprobaciones', label: 'Aprobaciones de Inversores', icon: CheckCircle, count: stats.solicitudesPendientes },
     { id: 'aprobaciones-socios', label: 'Aprobaciones Socios', icon: UsersIcon, count: stats.solicitudesPartnersPendientes },
     { id: 'avisos', label: 'Avisos', icon: MessageSquare, count: stats.avisosActivos },
     ...(admin?.role === 'admin' ? [

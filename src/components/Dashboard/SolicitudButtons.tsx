@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DollarSign, ArrowUpCircle, ArrowDownCircle, Copy, MessageCircle } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,6 +13,13 @@ const SolicitudButtons: React.FC = () => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
+  const [saldoActual, setSaldoActual] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      setSaldoActual(user.total);
+    }
+  }, [user]);
 
   const handleAmountChange = (value: string, setter: (value: string) => void) => {
     // No permitir que empiece con 0 o contenga comas
@@ -22,6 +29,21 @@ const SolicitudButtons: React.FC = () => {
     // Solo permitir números
     if (value === '' || /^\d+$/.test(value)) {
       setter(value);
+    }
+  };
+
+  const validateWithdrawAmount = async (amount: number): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc('validar_retiro_inversor', {
+        p_inversor_id: user?.id,
+        p_monto: amount
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error validating withdraw amount:', error);
+      return false;
     }
   };
 
@@ -60,6 +82,13 @@ const SolicitudButtons: React.FC = () => {
     const amount = parseInt(withdrawAmount);
     if (amount <= 0) return;
 
+    // Validar que el monto no sea mayor al saldo
+    const isValid = await validateWithdrawAmount(amount);
+    if (!isValid) {
+      alert(`No puede retirar más de su saldo actual: $${saldoActual.toLocaleString()}`);
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -93,6 +122,13 @@ const SolicitudButtons: React.FC = () => {
     window.open('https://t.me/TheAlexRz92', '_blank');
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
   return (
     <>
       {/* Botones de Solicitud */}
@@ -121,6 +157,7 @@ const SolicitudButtons: React.FC = () => {
           </div>
           <h3 className="text-xl font-bold text-white mb-2">Solicitar Retiro</h3>
           <p className="text-red-200 text-sm">Envía una solicitud de retiro de tus ganancias</p>
+          <p className="text-red-100 text-xs mt-2">Saldo disponible: {formatCurrency(saldoActual)}</p>
         </button>
       </div>
 
@@ -182,6 +219,12 @@ const SolicitudButtons: React.FC = () => {
             </h3>
             
             <div className="mb-4">
+              <div className="bg-blue-50 p-3 rounded-lg mb-3">
+                <p className="text-blue-800 text-sm">
+                  <strong>Saldo disponible:</strong> {formatCurrency(saldoActual)}
+                </p>
+              </div>
+              
               <label className="block text-gray-700 text-sm font-medium mb-2">
                 Monto del Retiro (USD)
               </label>
@@ -193,15 +236,21 @@ const SolicitudButtons: React.FC = () => {
                   onChange={(e) => handleAmountChange(e.target.value, setWithdrawAmount)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   placeholder="Ingrese el monto"
+                  max={saldoActual}
                 />
               </div>
               <p className="text-gray-500 text-xs mt-1">Solo números enteros, sin comas ni decimales</p>
+              {withdrawAmount && parseInt(withdrawAmount) > saldoActual && (
+                <p className="text-red-500 text-xs mt-1">
+                  El monto no puede ser mayor a su saldo disponible
+                </p>
+              )}
             </div>
             
             <div className="flex space-x-4">
               <button
                 onClick={handleWithdrawSubmit}
-                disabled={loading || !withdrawAmount || parseInt(withdrawAmount) <= 0}
+                disabled={loading || !withdrawAmount || parseInt(withdrawAmount) <= 0 || parseInt(withdrawAmount) > saldoActual}
                 className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Enviando...' : 'Enviar Solicitud'}
