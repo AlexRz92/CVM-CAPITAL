@@ -6,14 +6,14 @@ interface Notification {
   id: string;
   titulo: string;
   mensaje: string;
-  tipo: string;
+  tipo_notificacion: string;
   leida: boolean;
   fecha_creacion: string;
 }
 
 interface NotificationBellProps {
   userId?: string;
-  userType: 'inversor' | 'partner' | 'admin';
+  userType: 'inversor' | 'partner';
 }
 
 const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType }) => {
@@ -34,20 +34,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
     if (!userId) return;
 
     try {
-      let query = supabase.from('notificaciones').select('*');
-      
-      // Filtrar según el tipo de usuario
-      if (userType === 'inversor') {
-        query = query.eq('inversor_id', userId);
-      } else if (userType === 'partner') {
-        // Para partners, buscar notificaciones tanto por partner_id como por inversor_id si también es inversor
-        query = query.or(`partner_id.eq.${userId},inversor_id.eq.${userId}`);
-      } else if (userType === 'admin') {
-        // Para admins, buscar por admin_id
-        query = query.eq('admin_id', userId);
-      }
-
-      const { data, error } = await query
+      const { data, error } = await supabase
+        .from('notificaciones')
+        .select('*')
+        .eq('usuario_id', userId)
+        .eq('tipo_usuario', userType)
         .order('fecha_creacion', { ascending: false })
         .limit(20);
 
@@ -84,20 +75,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
 
   const markAllAsRead = async () => {
     try {
-      let query = supabase.from('notificaciones').update({ 
-        leida: true, 
-        fecha_leida: new Date().toISOString() 
-      });
-
-      if (userType === 'inversor') {
-        query = query.eq('inversor_id', userId);
-      } else if (userType === 'partner') {
-        query = query.or(`partner_id.eq.${userId},inversor_id.eq.${userId}`);
-      } else if (userType === 'admin') {
-        query = query.eq('admin_id', userId);
-      }
-
-      const { error } = await query.eq('leida', false);
+      const { error } = await supabase
+        .from('notificaciones')
+        .update({ 
+          leida: true, 
+          fecha_leida: new Date().toISOString() 
+        })
+        .eq('usuario_id', userId)
+        .eq('tipo_usuario', userType)
+        .eq('leida', false);
 
       if (error) {
         throw error;
@@ -204,7 +190,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
             ) : (
               <div className="divide-y divide-gray-100">
                 {notifications.map((notification) => {
-                  const style = getNotificationStyle(notification.tipo);
+                  const style = getNotificationStyle(notification.tipo_notificacion);
                   return (
                     <div
                       key={notification.id}

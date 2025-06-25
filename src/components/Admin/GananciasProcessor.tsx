@@ -110,7 +110,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
 
     setProcessing(true);
     try {
-      const { data, error } = await supabase.rpc('procesar_ganancias_semanales', {
+      const { error } = await supabase.rpc('procesar_ganancias_semanales', {
         p_porcentaje: formData.porcentaje ? parseFloat(formData.porcentaje) : null,
         p_ganancia_bruta: formData.ganancia_bruta ? parseFloat(formData.ganancia_bruta) : null,
         p_admin_id: admin?.id
