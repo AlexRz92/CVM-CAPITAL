@@ -56,17 +56,17 @@ const PartnerDashboard: React.FC = () => {
       const totalInversores = inversoresList.length;
       const montoTotal = inversoresList.reduce((sum, inv) => sum + (inv.total || 0), 0);
 
-      // Obtener ganancias del partner de la semana actual
+      // Obtener ganancias del partner de la semana actual - usar maybeSingle() en lugar de single()
       const { data: gananciasData, error: gananciasError } = await supabase
         .from('partner_ganancias')
         .select('*')
         .eq('partner_id', partner?.id)
         .order('semana_numero', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (gananciasError && gananciasError.code !== 'PGRST116') {
-        throw gananciasError;
+      if (gananciasError) {
+        console.error('Error fetching partner earnings:', gananciasError);
       }
 
       setGanancias({

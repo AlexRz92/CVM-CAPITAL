@@ -60,19 +60,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       console.log('Intentando login de admin con:', username);
       
-      // Buscar admin en la base de datos
+      // Buscar admin en la base de datos - usar maybeSingle() en lugar de single()
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('*')
         .eq('username', username)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (adminError) {
         console.error('Error verificando admin:', adminError);
-        if (adminError.code === 'PGRST116') {
-          return { success: false, error: 'Credenciales incorrectas' };
-        }
         return { success: false, error: 'Error de conexión. Inténtalo más tarde.' };
       }
 

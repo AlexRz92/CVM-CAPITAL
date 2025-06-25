@@ -72,6 +72,44 @@ export type Database = {
           descripcion?: string;
         };
       };
+      notificaciones: {
+        Row: {
+          id: string;
+          inversor_id: string | null;
+          partner_id: string | null;
+          admin_id: string | null;
+          titulo: string;
+          mensaje: string;
+          tipo: string;
+          leida: boolean;
+          fecha_creacion: string;
+          fecha_leida: string | null;
+        };
+        Insert: {
+          id?: string;
+          inversor_id?: string | null;
+          partner_id?: string | null;
+          admin_id?: string | null;
+          titulo: string;
+          mensaje: string;
+          tipo: string;
+          leida?: boolean;
+          fecha_creacion?: string;
+          fecha_leida?: string | null;
+        };
+        Update: {
+          id?: string;
+          inversor_id?: string | null;
+          partner_id?: string | null;
+          admin_id?: string | null;
+          titulo?: string;
+          mensaje?: string;
+          tipo?: string;
+          leida?: boolean;
+          fecha_creacion?: string;
+          fecha_leida?: string | null;
+        };
+      };
     };
   };
 };

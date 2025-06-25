@@ -43,14 +43,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
         // Para partners, buscar notificaciones tanto por partner_id como por inversor_id si también es inversor
         query = query.or(`partner_id.eq.${userId},inversor_id.eq.${userId}`);
       } else if (userType === 'admin') {
-        // Para admins, buscar por admin_id si existe la columna, sino buscar notificaciones generales
-        try {
-          query = query.eq('admin_id', userId);
-        } catch (error) {
-          // Si la columna admin_id no existe, buscar notificaciones sin filtro específico
-          console.warn('admin_id column not found, fetching general notifications');
-          query = query.is('inversor_id', null).is('partner_id', null);
-        }
+        // Para admins, buscar por admin_id
+        query = query.eq('admin_id', userId);
       }
 
       const { data, error } = await query
@@ -58,21 +52,6 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
         .limit(20);
 
       if (error) {
-        // Si hay error con admin_id, intentar sin ese filtro
-        if (error.message.includes('admin_id') && userType === 'admin') {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('notificaciones')
-            .select('*')
-            .is('inversor_id', null)
-            .is('partner_id', null)
-            .order('fecha_creacion', { ascending: false })
-            .limit(20);
-          
-          if (fallbackError) throw fallbackError;
-          setNotifications(fallbackData || []);
-          setUnreadCount(fallbackData?.filter(n => !n.leida).length || 0);
-          return;
-        }
         throw error;
       }
       
@@ -115,33 +94,13 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
       } else if (userType === 'partner') {
         query = query.or(`partner_id.eq.${userId},inversor_id.eq.${userId}`);
       } else if (userType === 'admin') {
-        try {
-          query = query.eq('admin_id', userId);
-        } catch (error) {
-          // Fallback para admins si no existe la columna admin_id
-          query = query.is('inversor_id', null).is('partner_id', null);
-        }
+        query = query.eq('admin_id', userId);
       }
 
       const { error } = await query.eq('leida', false);
 
       if (error) {
-        // Intentar fallback para admins
-        if (error.message.includes('admin_id') && userType === 'admin') {
-          const { error: fallbackError } = await supabase
-            .from('notificaciones')
-            .update({ 
-              leida: true, 
-              fecha_leida: new Date().toISOString() 
-            })
-            .is('inversor_id', null)
-            .is('partner_id', null)
-            .eq('leida', false);
-          
-          if (fallbackError) throw fallbackError;
-        } else {
-          throw error;
-        }
+        throw error;
       }
 
       fetchNotifications();
