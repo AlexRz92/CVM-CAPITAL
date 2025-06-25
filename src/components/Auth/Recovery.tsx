@@ -62,17 +62,13 @@ const Recovery: React.FC = () => {
         .from('inversores')
         .select('*')
         .eq('email', emailLower)
-        .single();
+        .maybeSingle();
 
       console.log('Resultado de la consulta:', { data, error });
 
       if (error) {
         console.error('Error en la consulta:', error);
-        if (error.code === 'PGRST116') {
-          setError('Correo electrónico no encontrado en nuestros registros');
-        } else {
-          setError('Error al verificar el correo electrónico. Inténtalo más tarde.');
-        }
+        setError('Error al verificar el correo electrónico. Inténtalo más tarde.');
       } else if (data) {
         console.log('Usuario encontrado:', data);
         setUserData(data);

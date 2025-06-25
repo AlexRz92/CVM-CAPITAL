@@ -69,13 +69,10 @@ export const PartnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select('*')
         .eq('username', username)
         .eq('activo', true)
-        .single();
+        .maybeSingle();
 
       if (partnerError) {
         console.error('Error verificando partner:', partnerError);
-        if (partnerError.code === 'PGRST116') {
-          return { success: false, error: 'Credenciales incorrectas' };
-        }
         return { success: false, error: 'Error de conexión. Inténtalo más tarde.' };
       }
 

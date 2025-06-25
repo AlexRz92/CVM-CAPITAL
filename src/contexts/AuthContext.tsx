@@ -121,13 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('inversores')
         .select('*')
         .eq('email', sanitizedEmail)
-        .single();
+        .maybeSingle();
 
       if (userError) {
         console.error('Error verificando usuario:', userError);
-        if (userError.code === 'PGRST116') {
-          return { success: false, error: 'Credenciales incorrectas' };
-        }
         return { success: false, error: 'Error de conexión. Inténtalo más tarde.' };
       }
 
@@ -215,9 +212,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('inversores')
         .select('id')
         .eq('email', sanitizedEmail)
-        .single();
+        .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') {
+      if (checkError) {
         console.error('Error verificando email existente:', checkError);
         return { success: false, error: 'Error de conexión. Inténtalo más tarde.' };
       }

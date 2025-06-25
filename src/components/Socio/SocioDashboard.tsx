@@ -74,9 +74,9 @@ const SocioDashboard: React.FC = () => {
         .eq('partner_id', partner?.id)
         .order('semana_numero', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (gananciasError && gananciasError.code !== 'PGRST116') {
+      if (gananciasError) {
         throw gananciasError;
       }
 
