@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { TrendingUp, DollarSign, PiggyBank } from 'lucide-react';
+import { supabase } from '../../config/supabase';
 
 interface User {
+  id: string;
   capital_inicial: number;
   ganancia_semanal: number;
   total: number;
@@ -12,6 +14,31 @@ interface StatsCardsProps {
 }
 
 const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
+  const [inversionTotal, setInversionTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchInversionTotal();
+    }
+  }, [user?.id]);
+
+  const fetchInversionTotal = async () => {
+    try {
+      const { data, error } = await supabase.rpc('calcular_inversion_total_inversor', {
+        p_inversor_id: user.id
+      });
+
+      if (error) throw error;
+      setInversionTotal(data || 0);
+    } catch (error) {
+      console.error('Error fetching total investment:', error);
+      setInversionTotal(user.capital_inicial);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-ES', {
       style: 'currency',
@@ -21,8 +48,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
 
   const cards = [
     {
-      title: 'Capital Inicial',
-      value: formatCurrency(user.capital_inicial),
+      title: 'Mi Inversión',
+      value: loading ? 'Cargando...' : formatCurrency(inversionTotal),
+      subtitle: `Saldo actual: ${formatCurrency(user.total)}`,
       icon: PiggyBank,
       color: 'from-blue-400 to-blue-600',
       bgColor: 'bg-blue-400/20',
@@ -31,6 +59,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
     {
       title: 'Ganancia Semanal',
       value: formatCurrency(user.ganancia_semanal),
+      subtitle: 'Última ganancia procesada',
       icon: TrendingUp,
       color: 'from-green-400 to-green-600',
       bgColor: 'bg-green-400/20',
@@ -39,6 +68,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
     {
       title: 'Total',
       value: formatCurrency(user.total),
+      subtitle: 'Saldo disponible',
       icon: DollarSign,
       color: 'from-cyan-400 to-cyan-600',
       bgColor: 'bg-cyan-400/20',
@@ -64,6 +94,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
           
           <div className="space-y-2">
             <p className="text-2xl font-bold text-white">{card.value}</p>
+            {card.subtitle && (
+              <p className="text-xs text-white/70">{card.subtitle}</p>
+            )}
             <div className="w-full bg-white/20 rounded-full h-2">
               <div 
                 className={`h-2 rounded-full bg-gradient-to-r ${card.color}`}

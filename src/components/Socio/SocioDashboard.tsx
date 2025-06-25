@@ -28,8 +28,21 @@ interface Transaction {
   descripcion: string;
 }
 
+interface PartnerData {
+  id: string;
+  username: string;
+  nombre: string;
+  email?: string;
+  tipo: 'partner' | 'operador_partner';
+  porcentaje_comision: number;
+  porcentaje_especial: number;
+  inversion_inicial: number;
+  inversion_total?: number;
+}
+
 const SocioDashboard: React.FC = () => {
   const { partner } = usePartner();
+  const [partnerData, setPartnerData] = useState<PartnerData | null>(null);
   const [inversores, setInversores] = useState<Inversor[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [ganancias, setGanancias] = useState({
@@ -50,6 +63,20 @@ const SocioDashboard: React.FC = () => {
 
   const fetchPartnerData = async () => {
     try {
+      // Obtener datos actualizados del partner
+      const { data: partnerDataResult, error: partnerError } = await supabase.rpc('obtener_datos_partner_actualizados', {
+        p_partner_id: partner?.id
+      });
+
+      if (partnerError) throw partnerError;
+
+      if (partnerDataResult) {
+        setPartnerData({
+          ...partner,
+          inversion_total: partnerDataResult.inversion_total
+        });
+      }
+
       // Obtener inversores del partner
       const { data: inversoresData, error: inversoresError } = await supabase
         .from('partner_inversores')
@@ -113,7 +140,7 @@ const SocioDashboard: React.FC = () => {
     }
   };
 
-  if (!partner) return null;
+  if (!partner || !partnerData) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-300 via-blue-400 to-blue-800">
@@ -138,7 +165,7 @@ const SocioDashboard: React.FC = () => {
             <SocioSolicitudButtons />
 
             {/* Tarjetas de Estadísticas */}
-            <SocioStatsCards partner={partner} ganancias={ganancias} />
+            <SocioStatsCards partner={partnerData} ganancias={ganancias} />
 
             {/* Gráficos */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

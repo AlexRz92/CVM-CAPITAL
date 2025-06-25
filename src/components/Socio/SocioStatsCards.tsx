@@ -6,6 +6,7 @@ interface Partner {
   porcentaje_comision: number;
   porcentaje_especial: number;
   inversion_inicial: number;
+  inversion_total?: number; // Nueva propiedad para inversión total histórica
 }
 
 interface Ganancias {
@@ -32,15 +33,26 @@ const SocioStatsCards: React.FC<SocioStatsCardsProps> = ({ partner, ganancias })
   const cards = [
     {
       title: 'Mi Inversión',
-      value: formatCurrency(partner.inversion_inicial),
+      value: formatCurrency(partner.inversion_total || partner.inversion_inicial),
+      subtitle: `Saldo actual: ${formatCurrency(partner.inversion_inicial)}`,
       icon: PiggyBank,
       color: 'from-blue-400 to-blue-600',
       bgColor: 'bg-blue-400/20',
       borderColor: 'border-cyan-200/50'
     },
     {
+      title: 'Mis Ganancias',
+      value: formatCurrency(ganancias.ganancia_total),
+      subtitle: 'Ganancias acumuladas',
+      icon: TrendingUp,
+      color: 'from-cyan-400 to-cyan-600',
+      bgColor: 'bg-cyan-400/20',
+      borderColor: 'border-cyan-200/50'
+    },
+    {
       title: 'Mis Inversores',
       value: ganancias.total_inversores.toString(),
+      subtitle: 'Inversores asignados',
       icon: Users,
       color: 'from-green-400 to-green-600',
       bgColor: 'bg-green-400/20',
@@ -49,17 +61,10 @@ const SocioStatsCards: React.FC<SocioStatsCardsProps> = ({ partner, ganancias })
     {
       title: 'Total Inversores',
       value: formatCurrency(ganancias.monto_total),
+      subtitle: 'Capital de mis inversores',
       icon: DollarSign,
       color: 'from-purple-400 to-purple-600',
       bgColor: 'bg-purple-400/20',
-      borderColor: 'border-cyan-200/50'
-    },
-    {
-      title: 'Mis Ganancias',
-      value: formatCurrency(ganancias.ganancia_total),
-      icon: TrendingUp,
-      color: 'from-cyan-400 to-cyan-600',
-      bgColor: 'bg-cyan-400/20',
       borderColor: 'border-cyan-200/50'
     }
   ];
@@ -82,6 +87,9 @@ const SocioStatsCards: React.FC<SocioStatsCardsProps> = ({ partner, ganancias })
           
           <div className="space-y-2">
             <p className="text-2xl font-bold text-white">{card.value}</p>
+            {card.subtitle && (
+              <p className="text-xs text-white/70">{card.subtitle}</p>
+            )}
             <div className="w-full bg-white/20 rounded-full h-2">
               <div 
                 className={`h-2 rounded-full bg-gradient-to-r ${card.color}`}
