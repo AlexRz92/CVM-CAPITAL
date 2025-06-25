@@ -10,6 +10,7 @@ interface ForexEvent {
   forecast: string;
   previous: string;
   actual?: string;
+  explanation?: string;
 }
 
 const ForexCalendar: React.FC = () => {
@@ -18,6 +19,8 @@ const ForexCalendar: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentWeek, setCurrentWeek] = useState(new Date());
+
+  const FMP_API_KEY = 'AlvgzZ9giVTCOVDDri9eKNJWUSyrZaE9';
 
   useEffect(() => {
     if (showCalendar) {
@@ -42,8 +45,10 @@ const ForexCalendar: React.FC = () => {
       const startDate = startOfWeek.toISOString().split('T')[0];
       const endDate = endOfWeek.toISOString().split('T')[0];
 
-      // Intentar obtener datos de FXStreet Economic Calendar API
-      const response = await fetch(`https://calendar-api.fxstreet.com/en/api/v1/eventDates/${startDate}/${endDate}?volatilities=3,2&categories=&countries=&timezone=GMT`);
+      // Llamada a Financial Modeling Prep API
+      const response = await fetch(
+        `https://financialmodelingprep.com/api/v3/economic_calendar?from=${startDate}&to=${endDate}&apikey=${FMP_API_KEY}`
+      );
       
       if (!response.ok) {
         throw new Error('No se pudieron obtener los datos del calendario económico');
@@ -51,18 +56,20 @@ const ForexCalendar: React.FC = () => {
 
       const data = await response.json();
       
-      // Procesar y filtrar eventos de FXStreet
-      const processedEvents = data.result
+      // Procesar y filtrar eventos de FMP
+      const processedEvents = data
         ?.filter((event: any) => {
-          return event.volatility >= 2; // Solo eventos de medio y alto impacto
+          // Filtrar solo eventos de medio y alto impacto
+          const impact = getImpactLevel(event.impact);
+          return impact === 'medium' || impact === 'high';
         })
         .map((event: any) => ({
-          title: event.name,
-          country: event.country?.code || 'N/A',
-          date: event.date.split('T')[0],
-          time: event.date.split('T')[1]?.substring(0, 5) || '00:00',
-          impact: event.volatility === 3 ? 'high' : event.volatility === 2 ? 'medium' : 'low',
-          forecast: event.forecast || 'N/A',
+          title: event.event || event.name || 'Evento Económico',
+          country: event.country || 'N/A',
+          date: event.date?.split(' ')[0] || startDate,
+          time: event.date?.split(' ')[1]?.substring(0, 5) || '00:00',
+          impact: getImpactLevel(event.impact),
+          forecast: event.estimate || event.forecast || 'N/A',
           previous: event.previous || 'N/A',
           actual: event.actual || undefined
         }))
@@ -85,6 +92,19 @@ const ForexCalendar: React.FC = () => {
     }
   };
 
+  const getImpactLevel = (impact: string): 'low' | 'medium' | 'high' => {
+    if (!impact) return 'low';
+    const impactLower = impact.toLowerCase();
+    
+    if (impactLower.includes('high') || impactLower.includes('alto') || impactLower === '3') {
+      return 'high';
+    } else if (impactLower.includes('medium') || impactLower.includes('medio') || impactLower === '2') {
+      return 'medium';
+    } else {
+      return 'low';
+    }
+  };
+
   const generateMockEvents = (): ForexEvent[] => {
     const today = new Date();
     const events = [
@@ -95,7 +115,8 @@ const ForexCalendar: React.FC = () => {
         time: '13:30',
         impact: 'high' as const,
         forecast: '200K',
-        previous: '187K'
+        previous: '187K',
+        explanation: 'Mide el cambio en el número de empleos durante el mes anterior, excluyendo el sector agrícola. Es un indicador clave de la salud económica.'
       },
       {
         title: 'Federal Funds Rate',
@@ -104,7 +125,8 @@ const ForexCalendar: React.FC = () => {
         time: '19:00',
         impact: 'high' as const,
         forecast: '5.50%',
-        previous: '5.25%'
+        previous: '5.25%',
+        explanation: 'Tasa de interés que los bancos se cobran entre sí por préstamos a un día. Afecta directamente a todas las tasas de interés en la economía.'
       },
       {
         title: 'ECB Interest Rate Decision',
@@ -113,7 +135,8 @@ const ForexCalendar: React.FC = () => {
         time: '12:45',
         impact: 'high' as const,
         forecast: '4.50%',
-        previous: '4.25%'
+        previous: '4.25%',
+        explanation: 'Decisión del Banco Central Europeo sobre las tasas de interés. Impacta el valor del Euro y la actividad económica en la Eurozona.'
       },
       {
         title: 'Consumer Price Index',
@@ -122,7 +145,18 @@ const ForexCalendar: React.FC = () => {
         time: '13:30',
         impact: 'medium' as const,
         forecast: '3.2%',
-        previous: '3.0%'
+        previous: '3.0%',
+        explanation: 'Mide el cambio en los precios que pagan los consumidores por bienes y servicios. Es el principal indicador de inflación.'
+      },
+      {
+        title: 'GDP Growth Rate',
+        country: 'US',
+        date: new Date(Date.now() + 345600000).toISOString().split('T')[0],
+        time: '13:30',
+        impact: 'high' as const,
+        forecast: '2.1%',
+        previous: '1.9%',
+        explanation: 'Mide el crecimiento económico del país. Un crecimiento positivo indica expansión económica, mientras que negativo indica recesión.'
       }
     ];
 
@@ -203,7 +237,7 @@ const ForexCalendar: React.FC = () => {
                   <Calendar className="w-8 h-8" />
                   <div>
                     <h3 className="text-2xl font-bold">Calendario Económico</h3>
-                    <p className="text-green-100">Eventos de Alto y Medio Impacto - FXStreet</p>
+                    <p className="text-green-100">Eventos de Alto y Medio Impacto - Financial Modeling Prep</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -281,7 +315,7 @@ const ForexCalendar: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mb-3">
                         <div>
                           <span className="font-medium text-gray-700">Pronóstico: </span>
                           <span className="text-gray-600">{event.forecast}</span>
@@ -297,6 +331,13 @@ const ForexCalendar: React.FC = () => {
                           </div>
                         )}
                       </div>
+
+                      {event.explanation && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-3">
+                          <h5 className="font-medium text-blue-900 mb-1">¿Qué significa?</h5>
+                          <p className="text-blue-800 text-sm">{event.explanation}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -315,7 +356,7 @@ const ForexCalendar: React.FC = () => {
                 </div>
               </div>
               <p className="text-center text-xs text-gray-500 mt-2">
-                Datos obtenidos de FXStreet Economic Calendar API. Actualización en tiempo real.
+                Datos obtenidos de Financial Modeling Prep API. Los eventos se filtran por impacto medio y alto.
               </p>
             </div>
           </div>
