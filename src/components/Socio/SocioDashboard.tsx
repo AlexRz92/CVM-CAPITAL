@@ -7,6 +7,8 @@ import SocioInversoresList from './SocioInversoresList';
 import SocioGananciasChart from './SocioGananciasChart';
 import SocioSolicitudButtons from './SocioSolicitudButtons';
 import SocioTransactionsTable from './SocioTransactionsTable';
+import ForexCalendar from '../Dashboard/ForexCalendar';
+import HelpChat from '../Dashboard/HelpChat';
 
 interface Inversor {
   id: string;
@@ -148,6 +150,10 @@ const SocioDashboard: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Componentes flotantes */}
+      <ForexCalendar />
+      <HelpChat />
     </div>
   );
 };

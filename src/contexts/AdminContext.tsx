@@ -54,6 +54,18 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     
     setLoading(false);
+
+    // Detectar cuando la página se recarga (F5 o refresh)
+    const handleBeforeUnload = () => {
+      // Limpiar sesión al recargar la página
+      localStorage.removeItem('cvm_admin_data');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {

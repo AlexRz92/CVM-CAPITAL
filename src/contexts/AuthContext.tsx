@@ -95,6 +95,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     setLoading(false);
+
+    // Detectar cuando la página se recarga (F5 o refresh)
+    const handleBeforeUnload = () => {
+      // Limpiar sesión al recargar la página
+      localStorage.removeItem('cvm_session_token');
+      localStorage.removeItem('cvm_user_data');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

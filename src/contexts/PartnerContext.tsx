@@ -57,6 +57,18 @@ export const PartnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     
     setLoading(false);
+
+    // Detectar cuando la página se recarga (F5 o refresh)
+    const handleBeforeUnload = () => {
+      // Limpiar sesión al recargar la página
+      localStorage.removeItem('cvm_partner_data');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   const login = async (username: string, password: string) => {
