@@ -5,6 +5,7 @@ import SocioHeader from './SocioHeader';
 import SocioStatsCards from './SocioStatsCards';
 import SocioInversoresList from './SocioInversoresList';
 import SocioGananciasChart from './SocioGananciasChart';
+import SocioDonutChart from './SocioDonutChart';
 import SocioSolicitudButtons from './SocioSolicitudButtons';
 import SocioTransactionsTable from './SocioTransactionsTable';
 import ForexCalendar from '../Dashboard/ForexCalendar';
@@ -139,8 +140,11 @@ const SocioDashboard: React.FC = () => {
             {/* Tarjetas de Estadísticas */}
             <SocioStatsCards partner={partner} ganancias={ganancias} />
 
-            {/* Gráfico de Ganancias */}
-            <SocioGananciasChart partnerId={partner.id} />
+            {/* Gráficos */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <SocioGananciasChart partnerId={partner.id} />
+              <SocioDonutChart partnerId={partner.id} />
+            </div>
 
             {/* Lista de Inversores */}
             <SocioInversoresList inversores={inversores} />

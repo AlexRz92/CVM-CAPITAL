@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpCircle, ArrowDownCircle, RefreshCw } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, RefreshCw, Clock } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -25,7 +25,9 @@ const SocioTransactionsTable: React.FC<SocioTransactionsTableProps> = ({ transac
     return new Date(dateString).toLocaleDateString('es-ES', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -39,8 +41,10 @@ const SocioTransactionsTable: React.FC<SocioTransactionsTableProps> = ({ transac
       case 'reinversion':
       case 'reinversión':
         return <RefreshCw className="w-5 h-5 text-blue-400" />;
+      case 'ganancia':
+        return <ArrowUpCircle className="w-5 h-5 text-yellow-400" />;
       default:
-        return <ArrowUpCircle className="w-5 h-5 text-gray-400" />;
+        return <Clock className="w-5 h-5 text-gray-400" />;
     }
   };
 
@@ -54,6 +58,8 @@ const SocioTransactionsTable: React.FC<SocioTransactionsTableProps> = ({ transac
       case 'reinversion':
       case 'reinversión':
         return 'text-blue-400';
+      case 'ganancia':
+        return 'text-yellow-400';
       default:
         return 'text-gray-300';
     }
