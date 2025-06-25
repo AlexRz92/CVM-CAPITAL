@@ -2,6 +2,7 @@ import React from 'react';
 import { LogOut, Shield, User } from 'lucide-react';
 import { useAdmin } from '../../contexts/AdminContext';
 import { useNavigate } from 'react-router-dom';
+import NotificationBell from '../Dashboard/NotificationBell';
 
 const AdminHeader: React.FC = () => {
   const { admin, logout } = useAdmin();
@@ -22,7 +23,6 @@ const AdminHeader: React.FC = () => {
     <header className="bg-gradient-to-r from-cyan-400 via-blue-500 to-blue-700 text-white shadow-lg">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo y título */}
           <div className="flex items-center space-x-4">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
               <Shield className="w-6 h-6 text-white" />
@@ -33,7 +33,6 @@ const AdminHeader: React.FC = () => {
             </div>
           </div>
 
-          {/* Información del admin */}
           <div className="flex items-center space-x-6">
             <div className="text-right">
               <p className="text-sm text-cyan-100">{currentDate}</p>
@@ -51,6 +50,8 @@ const AdminHeader: React.FC = () => {
                 </div>
               )}
             </div>
+            
+            <NotificationBell userId={admin?.id} userType="admin" />
             
             <button
               onClick={handleLogout}

@@ -1,7 +1,8 @@
 import React from 'react';
-import { LogOut, User, Users } from 'lucide-react';
+import { LogOut, Users } from 'lucide-react';
 import { usePartner } from '../../contexts/PartnerContext';
 import { useNavigate } from 'react-router-dom';
+import NotificationBell from '../Dashboard/NotificationBell';
 
 const SocioHeader: React.FC = () => {
   const { partner, logout } = usePartner();
@@ -21,7 +22,6 @@ const SocioHeader: React.FC = () => {
     <header className="bg-gradient-to-r from-purple-500 via-blue-500 to-cyan-500 text-white shadow-lg">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
           <div className="flex items-center space-x-4">
             <img 
               src="/logo2.png" 
@@ -33,7 +33,6 @@ const SocioHeader: React.FC = () => {
             </div>
           </div>
 
-          {/* Información del Partner */}
           <div className="flex items-center space-x-6">
             <div className="text-right">
               <p className="text-sm text-cyan-100">{currentDate}</p>
@@ -51,6 +50,8 @@ const SocioHeader: React.FC = () => {
                 </div>
               )}
             </div>
+            
+            <NotificationBell userId={partner?.id} userType="partner" />
             
             {partner && (
               <button

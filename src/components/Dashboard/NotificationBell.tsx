@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, X, Check, AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react';
 import { supabase } from '../../config/supabase';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface Notification {
   id: string;
@@ -12,29 +11,41 @@ interface Notification {
   fecha_creacion: string;
 }
 
-const NotificationBell: React.FC = () => {
-  const { user } = useAuth();
+interface NotificationBellProps {
+  userId?: string;
+  userType: 'inversor' | 'partner' | 'admin';
+}
+
+const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showPanel, setShowPanel] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       fetchNotifications();
       // Configurar polling para nuevas notificaciones
-      const interval = setInterval(fetchNotifications, 30000); // Cada 30 segundos
+      const interval = setInterval(fetchNotifications, 30000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [userId, userType]);
 
   const fetchNotifications = async () => {
-    if (!user) return;
+    if (!userId) return;
 
     try {
-      const { data, error } = await supabase
-        .from('notificaciones')
-        .select('*')
-        .eq('inversor_id', user.id)
+      let query = supabase.from('notificaciones').select('*');
+      
+      // Filtrar según el tipo de usuario
+      if (userType === 'inversor') {
+        query = query.eq('inversor_id', userId);
+      } else if (userType === 'partner') {
+        query = query.eq('partner_id', userId);
+      } else if (userType === 'admin') {
+        query = query.eq('admin_id', userId);
+      }
+
+      const { data, error } = await query
         .order('fecha_creacion', { ascending: false })
         .limit(10);
 
@@ -66,14 +77,20 @@ const NotificationBell: React.FC = () => {
 
   const markAllAsRead = async () => {
     try {
-      const { error } = await supabase
-        .from('notificaciones')
-        .update({ 
-          leida: true, 
-          fecha_leida: new Date().toISOString() 
-        })
-        .eq('inversor_id', user?.id)
-        .eq('leida', false);
+      let query = supabase.from('notificaciones').update({ 
+        leida: true, 
+        fecha_leida: new Date().toISOString() 
+      });
+
+      if (userType === 'inversor') {
+        query = query.eq('inversor_id', userId);
+      } else if (userType === 'partner') {
+        query = query.eq('partner_id', userId);
+      } else if (userType === 'admin') {
+        query = query.eq('admin_id', userId);
+      }
+
+      const { error } = await query.eq('leida', false);
 
       if (error) throw error;
       fetchNotifications();
@@ -132,7 +149,6 @@ const NotificationBell: React.FC = () => {
 
   return (
     <div className="relative">
-      {/* Botón de notificaciones */}
       <button
         onClick={() => setShowPanel(!showPanel)}
         className="relative p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
@@ -145,7 +161,6 @@ const NotificationBell: React.FC = () => {
         )}
       </button>
 
-      {/* Panel de notificaciones */}
       {showPanel && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50">
           <div className="p-4 border-b border-gray-200">

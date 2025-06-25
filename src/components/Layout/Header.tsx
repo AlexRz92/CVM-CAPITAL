@@ -14,7 +14,6 @@ const Header: React.FC = () => {
     <header className="bg-gradient-to-r from-cyan-400 via-blue-500 to-blue-700 text-white shadow-lg">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
           <div className="flex items-center space-x-4">
             <img 
               src="/logo2.png" 
@@ -26,7 +25,6 @@ const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Información del Usuario */}
           <div className="flex items-center space-x-6">
             <div className="text-right">
               <p className="text-sm text-cyan-100">{currentDate}</p>
@@ -38,8 +36,7 @@ const Header: React.FC = () => {
               )}
             </div>
             
-            {/* Campana de notificaciones */}
-            <NotificationBell />
+            <NotificationBell userId={user?.id} userType="inversor" />
             
             {user && (
               <button

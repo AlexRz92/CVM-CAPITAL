@@ -4,10 +4,11 @@ import { supabase } from '../../config/supabase';
 import AdminHeader from './AdminHeader';
 import InversoresList from './InversoresList';
 import AprobacionesList from './AprobacionesList';
+import PartnerAprobacionesList from './PartnerAprobacionesList';
 import AvisosList from './AvisosList';
 import ModeradoresList from './ModeradoresList';
 import AdministracionPanel from './AdministracionPanel';
-import { Users, CheckCircle, MessageSquare, UserPlus, Settings } from 'lucide-react';
+import { Users, CheckCircle, MessageSquare, UserPlus, Settings, UsersIcon } from 'lucide-react';
 
 const Operaciones: React.FC = () => {
   const { admin } = useAdmin();
@@ -15,6 +16,7 @@ const Operaciones: React.FC = () => {
   const [stats, setStats] = useState({
     totalInversores: 0,
     solicitudesPendientes: 0,
+    solicitudesPartnersPendientes: 0,
     avisosActivos: 0,
     moderadores: 0
   });
@@ -30,9 +32,15 @@ const Operaciones: React.FC = () => {
         .from('inversores')
         .select('*', { count: 'exact', head: true });
 
-      // Solicitudes pendientes
+      // Solicitudes pendientes de inversores
       const { count: solicitudesCount } = await supabase
         .from('solicitudes')
+        .select('*', { count: 'exact', head: true })
+        .eq('estado', 'pendiente');
+
+      // Solicitudes pendientes de partners
+      const { count: solicitudesPartnersCount } = await supabase
+        .from('partner_solicitudes')
         .select('*', { count: 'exact', head: true })
         .eq('estado', 'pendiente');
 
@@ -52,6 +60,7 @@ const Operaciones: React.FC = () => {
       setStats({
         totalInversores: inversoresCount || 0,
         solicitudesPendientes: solicitudesCount || 0,
+        solicitudesPartnersPendientes: solicitudesPartnersCount || 0,
         avisosActivos: avisosCount || 0,
         moderadores: moderadoresCount || 0
       });
@@ -63,6 +72,7 @@ const Operaciones: React.FC = () => {
   const tabs = [
     { id: 'inversores', label: 'Inversores', icon: Users, count: stats.totalInversores },
     { id: 'aprobaciones', label: 'Aprobaciones', icon: CheckCircle, count: stats.solicitudesPendientes },
+    { id: 'aprobaciones-socios', label: 'Aprobaciones Socios', icon: UsersIcon, count: stats.solicitudesPartnersPendientes },
     { id: 'avisos', label: 'Avisos', icon: MessageSquare, count: stats.avisosActivos },
     ...(admin?.role === 'admin' ? [
       { id: 'moderadores', label: 'Moderadores', icon: UserPlus, count: stats.moderadores },
@@ -75,7 +85,6 @@ const Operaciones: React.FC = () => {
       <AdminHeader />
       
       <main className="container mx-auto px-6 py-8">
-        {/* Título */}
         <div className="text-center mb-8">
           <h2 className="text-4xl font-bold text-white mb-2 tracking-wide uppercase">
             Panel de Operaciones
@@ -83,7 +92,6 @@ const Operaciones: React.FC = () => {
           <div className="w-24 h-1 bg-gradient-to-r from-cyan-200 to-white mx-auto rounded-full"></div>
         </div>
 
-        {/* Tabs */}
         <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-cyan-200/30 mb-8">
           <div className="flex flex-wrap gap-4 justify-center">
             {tabs.map((tab) => (
@@ -112,10 +120,10 @@ const Operaciones: React.FC = () => {
           </div>
         </div>
 
-        {/* Contenido de las tabs */}
         <div className="space-y-8">
           {activeTab === 'inversores' && <InversoresList onStatsUpdate={fetchStats} />}
           {activeTab === 'aprobaciones' && <AprobacionesList onStatsUpdate={fetchStats} />}
+          {activeTab === 'aprobaciones-socios' && <PartnerAprobacionesList onStatsUpdate={fetchStats} />}
           {activeTab === 'avisos' && <AvisosList onStatsUpdate={fetchStats} />}
           {activeTab === 'moderadores' && admin?.role === 'admin' && <ModeradoresList onStatsUpdate={fetchStats} />}
           {activeTab === 'administracion' && admin?.role === 'admin' && <AdministracionPanel onStatsUpdate={fetchStats} />}
