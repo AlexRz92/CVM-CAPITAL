@@ -24,8 +24,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
   useEffect(() => {
     if (userId) {
       fetchNotifications();
-      // Configurar polling para nuevas notificaciones
-      const interval = setInterval(fetchNotifications, 30000);
+      // Configurar polling para nuevas notificaciones cada 10 segundos
+      const interval = setInterval(fetchNotifications, 10000);
       return () => clearInterval(interval);
     }
   }, [userId, userType]);
@@ -40,14 +40,26 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
       if (userType === 'inversor') {
         query = query.eq('inversor_id', userId);
       } else if (userType === 'partner') {
-        query = query.eq('partner_id', userId);
+        // Para partners, buscar notificaciones tanto por partner_id como por inversor_id si también es inversor
+        const { data: partnerNotifications, error: partnerError } = await supabase
+          .from('notificaciones')
+          .select('*')
+          .or(`partner_id.eq.${userId},inversor_id.eq.${userId}`)
+          .order('fecha_creacion', { ascending: false })
+          .limit(20);
+
+        if (partnerError) throw partnerError;
+        
+        setNotifications(partnerNotifications || []);
+        setUnreadCount(partnerNotifications?.filter(n => !n.leida).length || 0);
+        return;
       } else if (userType === 'admin') {
         query = query.eq('admin_id', userId);
       }
 
       const { data, error } = await query
         .order('fecha_creacion', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       
@@ -85,7 +97,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
       if (userType === 'inversor') {
         query = query.eq('inversor_id', userId);
       } else if (userType === 'partner') {
-        query = query.eq('partner_id', userId);
+        query = query.or(`partner_id.eq.${userId},inversor_id.eq.${userId}`);
       } else if (userType === 'admin') {
         query = query.eq('admin_id', userId);
       }
@@ -155,7 +167,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, userType })
       >
         <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

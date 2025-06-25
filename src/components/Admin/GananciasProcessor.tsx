@@ -15,6 +15,7 @@ interface PreviewData {
   ganancia_inversores: number;
   semana: number;
   distribucion_partners: any[];
+  distribucion_inversores: any[];
 }
 
 const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion, onUpdate }) => {
@@ -27,6 +28,26 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [semanaActual, setSemanaActual] = useState(1);
+
+  useEffect(() => {
+    fetchSemanaActual();
+  }, []);
+
+  const fetchSemanaActual = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('configuracion_sistema')
+        .select('valor')
+        .eq('clave', 'semana_actual')
+        .single();
+
+      if (error) throw error;
+      setSemanaActual(parseInt(data?.valor || '1'));
+    } catch (error) {
+      console.error('Error fetching semana actual:', error);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-ES', {
@@ -52,34 +73,33 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
       const ganancia_inversores = ganancia_bruta * 0.70;
 
       // Obtener distribución de partners
-      const { data: distribucionPartners, error } = await supabase.rpc('obtener_distribucion_partners', {
+      const { data: distribucionPartners, error: partnersError } = await supabase.rpc('obtener_distribucion_partners', {
         p_ganancia_partners: ganancia_partners
       });
 
-      if (error) throw error;
+      if (partnersError) throw partnersError;
 
-      // Obtener semana actual
-      const { data: configData, error: configError } = await supabase
-        .from('configuracion_sistema')
-        .select('valor')
-        .eq('clave', 'semana_actual')
-        .single();
+      // Obtener distribución de inversores
+      const { data: distribucionInversores, error: inversoresError } = await supabase.rpc('obtener_distribucion_inversores', {
+        p_ganancia_inversores: ganancia_inversores
+      });
 
-      if (configError) throw configError;
+      if (inversoresError) throw inversoresError;
 
       setPreviewData({
         total_inversion: totalInversion,
         ganancia_bruta,
         ganancia_partners,
         ganancia_inversores,
-        semana: parseInt(configData?.valor || '1'),
-        distribucion_partners: distribucionPartners || []
+        semana: semanaActual,
+        distribucion_partners: distribucionPartners || [],
+        distribucion_inversores: distribucionInversores || []
       });
 
       setShowPreview(true);
     } catch (error) {
       console.error('Error generating preview:', error);
-      alert('Error al generar vista previa');
+      alert('Error al generar vista previa: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -103,10 +123,10 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
       setPreviewData(null);
       onUpdate();
       
-      alert('Ganancias procesadas exitosamente. Se han enviado notificaciones a todos los inversores.');
+      alert('Ganancias procesadas exitosamente. Se han enviado notificaciones a todos los inversores y partners.');
     } catch (error) {
       console.error('Error processing earnings:', error);
-      alert('Error al procesar las ganancias. Inténtalo de nuevo.');
+      alert('Error al procesar las ganancias: ' + (error as Error).message);
     } finally {
       setProcessing(false);
     }
@@ -131,7 +151,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
             </div>
             <div>
               <p className="text-white/70 text-sm">Semana Actual</p>
-              <p className="text-xl font-bold text-blue-300">1</p>
+              <p className="text-xl font-bold text-blue-300">{semanaActual}</p>
             </div>
           </div>
         </div>
@@ -197,7 +217,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
         <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-cyan-200/30">
           <h3 className="text-xl font-bold text-white mb-6 flex items-center">
             <Users className="w-6 h-6 mr-3" />
-            Vista Previa de Distribución
+            Vista Previa de Distribución - Semana {previewData.semana}
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -226,7 +246,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
           {previewData.distribucion_partners.length > 0 && (
             <div className="mb-6">
               <h4 className="text-white font-semibold mb-4">Distribución por Partners</h4>
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-40 overflow-y-auto">
                 {previewData.distribucion_partners.map((partner, index) => (
                   <div key={index} className="bg-white/5 rounded-lg p-4 border border-white/10">
                     <div className="flex items-center justify-between">
@@ -258,14 +278,27 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
             </div>
           )}
 
+          {/* Distribución por Inversores */}
+          {previewData.distribucion_inversores.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-white font-semibold mb-4">Distribución por Inversores ({previewData.distribucion_inversores.length})</h4>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <p className="text-white/80 text-sm">
+                  Se distribuirán ganancias a {previewData.distribucion_inversores.length} inversores 
+                  proporcionalmente según su inversión actual.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Información adicional */}
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
             <h4 className="text-yellow-300 font-semibold mb-2">Información Importante</h4>
             <ul className="text-yellow-200 text-sm space-y-1">
               <li>• Las ganancias se distribuirán proporcionalmente según la inversión de cada usuario</li>
-              <li>• Se enviará una notificación automática a todos los inversores</li>
+              <li>• Se enviará una notificación automática a todos los inversores y partners</li>
               <li>• Los totales de los usuarios se actualizarán automáticamente</li>
-              <li>• Se creará un registro de transacción para cada inversor</li>
+              <li>• Se creará un registro de transacción para cada inversor y partner</li>
               <li>• Los partners recibirán sus comisiones según su configuración</li>
             </ul>
           </div>

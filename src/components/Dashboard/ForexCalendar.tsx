@@ -9,6 +9,7 @@ interface ForexEvent {
   impact: 'low' | 'medium' | 'high';
   forecast: string;
   previous: string;
+  actual?: string;
 }
 
 const ForexCalendar: React.FC = () => {
@@ -41,38 +42,35 @@ const ForexCalendar: React.FC = () => {
       const startDate = startOfWeek.toISOString().split('T')[0];
       const endDate = endOfWeek.toISOString().split('T')[0];
 
-      // Intentar obtener datos de Forex Factory
-      const response = await fetch(`https://nfs.faireconomy.media/ff_calendar_thisweek.json?version=1`);
+      // Intentar obtener datos de FXStreet Economic Calendar API
+      const response = await fetch(`https://calendar-api.fxstreet.com/en/api/v1/eventDates/${startDate}/${endDate}?volatilities=3,2&categories=&countries=&timezone=GMT`);
       
       if (!response.ok) {
-        throw new Error('No se pudieron obtener los datos del calendario');
+        throw new Error('No se pudieron obtener los datos del calendario económico');
       }
 
       const data = await response.json();
       
-      // Procesar y filtrar eventos
-      const processedEvents = data
-        .filter((event: any) => {
-          const eventDate = new Date(event.date);
-          const weekStart = new Date(startDate);
-          const weekEnd = new Date(endDate);
-          return eventDate >= weekStart && eventDate <= weekEnd && 
-                 (event.impact === 'High' || event.impact === 'Medium');
+      // Procesar y filtrar eventos de FXStreet
+      const processedEvents = data.result
+        ?.filter((event: any) => {
+          return event.volatility >= 2; // Solo eventos de medio y alto impacto
         })
         .map((event: any) => ({
-          title: event.title,
-          country: event.country,
-          date: event.date,
-          time: event.time,
-          impact: event.impact.toLowerCase(),
+          title: event.name,
+          country: event.country?.code || 'N/A',
+          date: event.date.split('T')[0],
+          time: event.date.split('T')[1]?.substring(0, 5) || '00:00',
+          impact: event.volatility === 3 ? 'high' : event.volatility === 2 ? 'medium' : 'low',
           forecast: event.forecast || 'N/A',
-          previous: event.previous || 'N/A'
+          previous: event.previous || 'N/A',
+          actual: event.actual || undefined
         }))
         .sort((a: ForexEvent, b: ForexEvent) => {
           const dateA = new Date(`${a.date} ${a.time}`);
           const dateB = new Date(`${b.date} ${b.time}`);
           return dateA.getTime() - dateB.getTime();
-        });
+        }) || [];
 
       setEvents(processedEvents);
     } catch (error) {
@@ -88,11 +86,12 @@ const ForexCalendar: React.FC = () => {
   };
 
   const generateMockEvents = (): ForexEvent[] => {
+    const today = new Date();
     const events = [
       {
         title: 'Non-Farm Payrolls',
-        country: 'USD',
-        date: new Date().toISOString().split('T')[0],
+        country: 'US',
+        date: today.toISOString().split('T')[0],
         time: '13:30',
         impact: 'high' as const,
         forecast: '200K',
@@ -100,7 +99,7 @@ const ForexCalendar: React.FC = () => {
       },
       {
         title: 'Federal Funds Rate',
-        country: 'USD',
+        country: 'US',
         date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         time: '19:00',
         impact: 'high' as const,
@@ -109,7 +108,7 @@ const ForexCalendar: React.FC = () => {
       },
       {
         title: 'ECB Interest Rate Decision',
-        country: 'EUR',
+        country: 'EU',
         date: new Date(Date.now() + 172800000).toISOString().split('T')[0],
         time: '12:45',
         impact: 'high' as const,
@@ -118,7 +117,7 @@ const ForexCalendar: React.FC = () => {
       },
       {
         title: 'Consumer Price Index',
-        country: 'USD',
+        country: 'US',
         date: new Date(Date.now() + 259200000).toISOString().split('T')[0],
         time: '13:30',
         impact: 'medium' as const,
@@ -190,7 +189,7 @@ const ForexCalendar: React.FC = () => {
       <button
         onClick={() => setShowCalendar(true)}
         className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-br from-green-500 to-green-700 text-white rounded-full shadow-2xl hover:scale-110 transition-all duration-300 flex items-center justify-center z-40"
-        title="Calendario Forex"
+        title="Calendario Económico"
       >
         <Calendar className="w-8 h-8" />
       </button>
@@ -203,8 +202,8 @@ const ForexCalendar: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-8 h-8" />
                   <div>
-                    <h3 className="text-2xl font-bold">Calendario Forex</h3>
-                    <p className="text-green-100">Eventos de Alto y Medio Impacto</p>
+                    <h3 className="text-2xl font-bold">Calendario Económico</h3>
+                    <p className="text-green-100">Eventos de Alto y Medio Impacto - FXStreet</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -282,7 +281,7 @@ const ForexCalendar: React.FC = () => {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="font-medium text-gray-700">Pronóstico: </span>
                           <span className="text-gray-600">{event.forecast}</span>
@@ -291,6 +290,12 @@ const ForexCalendar: React.FC = () => {
                           <span className="font-medium text-gray-700">Anterior: </span>
                           <span className="text-gray-600">{event.previous}</span>
                         </div>
+                        {event.actual && (
+                          <div>
+                            <span className="font-medium text-gray-700">Actual: </span>
+                            <span className="text-gray-600 font-semibold">{event.actual}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -310,7 +315,7 @@ const ForexCalendar: React.FC = () => {
                 </div>
               </div>
               <p className="text-center text-xs text-gray-500 mt-2">
-                Datos obtenidos de Forex Factory. Actualización en tiempo real.
+                Datos obtenidos de FXStreet Economic Calendar API. Actualización en tiempo real.
               </p>
             </div>
           </div>
