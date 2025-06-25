@@ -103,21 +103,35 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
 
     setCheckingUsername(true);
     try {
-      // Verificar en partners
+      // Verificar en partners - usar maybeSingle() para manejar 0 resultados
       const { data: partnerData, error: partnerError } = await supabase
         .from('partners')
         .select('id')
         .eq('username', username)
-        .single();
+        .maybeSingle();
 
-      // Verificar en admins
+      // Verificar en admins - usar maybeSingle() para manejar 0 resultados
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('id')
         .eq('username', username)
-        .single();
+        .maybeSingle();
 
-      const isAvailable = (partnerError?.code === 'PGRST116') && (adminError?.code === 'PGRST116');
+      // Si hay errores diferentes a "no rows found", mostrar error
+      if (partnerError && partnerError.code !== 'PGRST116') {
+        console.error('Error checking username in partners:', partnerError);
+        setUsernameAvailable(false);
+        return;
+      }
+
+      if (adminError && adminError.code !== 'PGRST116') {
+        console.error('Error checking username in admins:', adminError);
+        setUsernameAvailable(false);
+        return;
+      }
+
+      // El username está disponible si no se encontró en ninguna tabla
+      const isAvailable = !partnerData && !adminData;
       setUsernameAvailable(isAvailable);
     } catch (error) {
       console.error('Error checking username:', error);
