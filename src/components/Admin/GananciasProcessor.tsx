@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
 import { useAdmin } from '../../contexts/AdminContext';
-import { TrendingUp, DollarSign, Users, Calculator, Send } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, Calculator, Send, Settings } from 'lucide-react';
 
 interface GananciasProcessorProps {
   totalInversion: number;
@@ -24,14 +24,17 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
     porcentaje: '',
     ganancia_bruta: ''
   });
+  const [porcentajeInversores, setPorcentajeInversores] = useState(70);
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [semanaActual, setSemanaActual] = useState(1);
+  const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
     fetchSemanaActual();
+    fetchPorcentajeInversores();
   }, []);
 
   const fetchSemanaActual = async () => {
@@ -46,6 +49,53 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
       setSemanaActual(parseInt(data?.valor || '1'));
     } catch (error) {
       console.error('Error fetching semana actual:', error);
+    }
+  };
+
+  const fetchPorcentajeInversores = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('configuracion_sistema')
+        .select('valor')
+        .eq('clave', 'porcentaje_inversores')
+        .single();
+
+      if (error) {
+        // Si no existe, crear con valor por defecto
+        await supabase
+          .from('configuracion_sistema')
+          .insert({
+            clave: 'porcentaje_inversores',
+            valor: '70',
+            descripcion: 'Porcentaje de ganancias para inversores'
+          });
+        setPorcentajeInversores(70);
+      } else {
+        setPorcentajeInversores(parseInt(data?.valor || '70'));
+      }
+    } catch (error) {
+      console.error('Error fetching porcentaje inversores:', error);
+      setPorcentajeInversores(70);
+    }
+  };
+
+  const updatePorcentajeInversores = async () => {
+    try {
+      const { error } = await supabase
+        .from('configuracion_sistema')
+        .upsert({
+          clave: 'porcentaje_inversores',
+          valor: porcentajeInversores.toString(),
+          descripcion: 'Porcentaje de ganancias para inversores',
+          updated_by: admin?.id,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      alert('Porcentaje de inversores actualizado correctamente');
+    } catch (error) {
+      console.error('Error updating porcentaje inversores:', error);
+      alert('Error al actualizar el porcentaje');
     }
   };
 
@@ -69,8 +119,8 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
         ganancia_bruta = (parseFloat(formData.porcentaje) * totalInversion) / 100;
       }
 
-      const ganancia_partners = ganancia_bruta * 0.30;
-      const ganancia_inversores = ganancia_bruta * 0.70;
+      const ganancia_partners = ganancia_bruta * ((100 - porcentajeInversores) / 100);
+      const ganancia_inversores = ganancia_bruta * (porcentajeInversores / 100);
 
       // Obtener distribución de partners
       const { data: distribucionPartners, error: partnersError } = await supabase.rpc('obtener_distribucion_partners', {
@@ -134,6 +184,53 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
 
   return (
     <div className="space-y-6">
+      {/* Configuración de Porcentajes */}
+      <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-cyan-200/30">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-white flex items-center">
+            <Settings className="w-5 h-5 mr-2" />
+            Configuración de Distribución
+          </h3>
+          <button
+            onClick={() => setShowConfig(!showConfig)}
+            className="text-white/80 hover:text-white transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+        
+        {showConfig && (
+          <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-white text-sm font-medium mb-2">
+                  Porcentaje para Inversores (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={porcentajeInversores}
+                  onChange={(e) => setPorcentajeInversores(parseInt(e.target.value) || 70)}
+                  className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                />
+                <p className="text-white/60 text-xs mt-1">
+                  Partners recibirán: {100 - porcentajeInversores}%
+                </p>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={updatePorcentajeInversores}
+                  className="bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-colors"
+                >
+                  Actualizar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Formulario de entrada */}
       <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-cyan-200/30">
         <h3 className="text-xl font-bold text-white mb-6 flex items-center">
@@ -144,7 +241,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
         {/* Información actual */}
         <div className="bg-white/10 rounded-lg p-4 border border-white/20 mb-6">
           <h4 className="text-white font-semibold mb-3">Información Actual</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p className="text-white/70 text-sm">Total en Inversión</p>
               <p className="text-xl font-bold text-green-300">{formatCurrency(totalInversion)}</p>
@@ -152,6 +249,12 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
             <div>
               <p className="text-white/70 text-sm">Semana Actual</p>
               <p className="text-xl font-bold text-blue-300">{semanaActual}</p>
+            </div>
+            <div>
+              <p className="text-white/70 text-sm">Distribución</p>
+              <p className="text-sm text-white/80">
+                Inversores: {porcentajeInversores}% | Partners: {100 - porcentajeInversores}%
+              </p>
             </div>
           </div>
         </div>
@@ -232,12 +335,12 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
             </div>
 
             <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-              <h4 className="text-white/80 text-sm font-medium mb-2">Para Partners (30%)</h4>
+              <h4 className="text-white/80 text-sm font-medium mb-2">Para Partners ({100 - porcentajeInversores}%)</h4>
               <p className="text-2xl font-bold text-yellow-300">{formatCurrency(previewData.ganancia_partners)}</p>
             </div>
 
             <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-              <h4 className="text-white/80 text-sm font-medium mb-2">Para Inversores (70%)</h4>
+              <h4 className="text-white/80 text-sm font-medium mb-2">Para Inversores ({porcentajeInversores}%)</h4>
               <p className="text-2xl font-bold text-purple-300">{formatCurrency(previewData.ganancia_inversores)}</p>
             </div>
           </div>
@@ -246,7 +349,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
           {previewData.distribucion_partners.length > 0 && (
             <div className="mb-6">
               <h4 className="text-white font-semibold mb-4">Distribución por Partners</h4>
-              <div className="space-y-3 max-h-40 overflow-y-auto">
+              <div className="space-y-3 max-h-60 overflow-y-auto">
                 {previewData.distribucion_partners.map((partner, index) => (
                   <div key={index} className="bg-white/5 rounded-lg p-4 border border-white/10">
                     <div className="flex items-center justify-between">
@@ -257,17 +360,25 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
                           {partner.total_inversores} inversores • 
                           {formatCurrency(partner.monto_total_inversores)}
                         </p>
+                        <p className="text-white/60 text-xs">
+                          Inversión propia: {formatCurrency(partner.inversion_inicial)}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-white font-semibold">
-                          {formatCurrency(partner.ganancia_comision + partner.ganancia_operador)}
+                        <p className="text-white font-semibold text-lg">
+                          {formatCurrency(partner.ganancia_total)}
                         </p>
                         <div className="text-white/70 text-sm">
-                          {partner.ganancia_comision > 0 && (
-                            <span>Partner: {formatCurrency(partner.ganancia_comision)}</span>
-                          )}
-                          {partner.ganancia_operador > 0 && (
-                            <span className="block">Operador: {formatCurrency(partner.ganancia_operador)}</span>
+                          {partner.tipo === 'operador_partner' ? (
+                            <>
+                              <span className="block">Operador: {formatCurrency(partner.ganancia_operador)}</span>
+                              <span className="block">Comisión: {formatCurrency(partner.ganancia_comision)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="block">Propia: {formatCurrency(partner.ganancia_operador)}</span>
+                              <span className="block">Comisión: {formatCurrency(partner.ganancia_comision)}</span>
+                            </>
                           )}
                         </div>
                       </div>
@@ -281,25 +392,44 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
           {/* Distribución por Inversores */}
           {previewData.distribucion_inversores.length > 0 && (
             <div className="mb-6">
-              <h4 className="text-white font-semibold mb-4">Distribución por Inversores ({previewData.distribucion_inversores.length})</h4>
-              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                <p className="text-white/80 text-sm">
-                  Se distribuirán ganancias a {previewData.distribucion_inversores.length} inversores 
-                  proporcionalmente según su inversión actual.
-                </p>
+              <h4 className="text-white font-semibold mb-4">
+                Distribución por Inversores ({previewData.distribucion_inversores.length})
+              </h4>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10 max-h-40 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {previewData.distribucion_inversores.map((inversor: any, index: number) => (
+                    <div key={index} className="flex justify-between items-center p-2 bg-white/5 rounded">
+                      <div>
+                        <p className="text-white text-sm font-medium">
+                          {inversor.nombre} {inversor.apellido}
+                        </p>
+                        <p className="text-white/60 text-xs">
+                          Inversión: {formatCurrency(inversor.inversion)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-green-300 font-semibold text-sm">
+                          {formatCurrency(inversor.ganancia_individual)}
+                        </p>
+                        <p className="text-white/60 text-xs">
+                          {inversor.porcentaje_ganancia}% × {inversor.porcentaje_inversor}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
           {/* Información adicional */}
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
-            <h4 className="text-yellow-300 font-semibold mb-2">Información Importante</h4>
+            <h4 className="text-yellow-300 font-semibold mb-2">Cálculo Detallado</h4>
             <ul className="text-yellow-200 text-sm space-y-1">
-              <li>• Las ganancias se distribuirán proporcionalmente según la inversión de cada usuario</li>
-              <li>• Se enviará una notificación automática a todos los inversores y partners</li>
-              <li>• Los totales de los usuarios se actualizarán automáticamente</li>
-              <li>• Se creará un registro de transacción para cada inversor y partner</li>
-              <li>• Los partners recibirán sus comisiones según su configuración</li>
+              <li>• <strong>Partners + Operadores:</strong> Reciben 100% de su ganancia propia + 100% del {100 - porcentajeInversores}% de sus inversores</li>
+              <li>• <strong>Partners normales:</strong> Reciben {porcentajeInversores}% de su ganancia propia + su % de comisión del {100 - porcentajeInversores}% de sus inversores</li>
+              <li>• <strong>Inversores:</strong> Reciben {porcentajeInversores}% de su ganancia (5% de su inversión)</li>
+              <li>• <strong>Distribución:</strong> {porcentajeInversores}% para inversores, {100 - porcentajeInversores}% para partners</li>
             </ul>
           </div>
 
