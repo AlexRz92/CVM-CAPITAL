@@ -25,6 +25,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
     fecha_inicio_semana: ''
   });
   const [configLoading, setConfigLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
     fetchEstadisticas();
@@ -35,15 +36,41 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
 
   const fetchEstadisticas = async () => {
     try {
-      const { data, error } = await supabase.rpc('obtener_estadisticas_admin');
+      // Obtener total de inversión
+      const { data: inversionData, error: inversionError } = await supabase.rpc('calcular_total_inversion_sistema');
       
-      if (error) throw error;
-      setEstadisticas(data || {
-        total_inversion: 0,
-        partners_activos: 0,
-        total_inversores: 0,
-        semana_actual: 1,
-        ganancia_semanal_actual: 0
+      // Obtener partners activos
+      const { count: partnersCount } = await supabase
+        .from('partners')
+        .select('*', { count: 'exact', head: true })
+        .eq('activo', true);
+
+      // Obtener total inversores
+      const { count: inversoresCount } = await supabase
+        .from('inversores')
+        .select('*', { count: 'exact', head: true });
+
+      // Obtener semana actual
+      const { data: semanaData, error: semanaError } = await supabase
+        .from('configuracion_sistema')
+        .select('valor')
+        .eq('clave', 'semana_actual')
+        .maybeSingle();
+
+      // Obtener ganancia semanal actual
+      const semanaActual = semanaData?.valor ? parseInt(semanaData.valor) : 1;
+      const { data: gananciaData, error: gananciaError } = await supabase
+        .from('ganancias_semanales')
+        .select('ganancia_bruta')
+        .eq('semana_numero', semanaActual)
+        .maybeSingle();
+
+      setEstadisticas({
+        total_inversion: inversionData || 0,
+        partners_activos: partnersCount || 0,
+        total_inversores: inversoresCount || 0,
+        semana_actual: semanaActual,
+        ganancia_semanal_actual: gananciaData?.ganancia_bruta || 0
       });
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -88,7 +115,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
 
       if (error) throw error;
 
-      alert('Configuración actualizada exitosamente');
+      setShowSuccessModal(true);
       fetchEstadisticas();
       onStatsUpdate();
     } catch (error) {
@@ -302,6 +329,25 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
                 <span>{configLoading ? 'Guardando...' : 'Guardar Configuración'}</span>
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de éxito para configuración */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Configuración Guardada</h3>
+            <p className="text-gray-600 mb-6">
+              La configuración de la semana se ha guardado correctamente.
+            </p>
+            
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

@@ -28,6 +28,7 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [respuestaForm, setRespuestaForm] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showCloseModal, setShowCloseModal] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTickets();
@@ -76,8 +77,6 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
   };
 
   const handleCerrar = async (ticketId: string) => {
-    if (!confirm('¿Estás seguro de que deseas cerrar este ticket?')) return;
-
     setProcessingId(ticketId);
     try {
       const { data, error } = await supabase.rpc('cerrar_ticket', {
@@ -88,6 +87,7 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
       if (error) throw error;
 
       if (data.success) {
+        setShowCloseModal(null);
         fetchTickets();
         onStatsUpdate();
       } else {
@@ -204,7 +204,7 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
                       <button
                         onClick={() => handleResponder(ticket.id)}
                         disabled={!respuestaForm.trim() || processingId === ticket.id}
-                        className="flex items-center space-x-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                        className="flex items-center space-x-2 bg-blue-500/20 text-white px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50"
                       >
                         <Send className="w-4 h-4" />
                         <span>{processingId === ticket.id ? 'Enviando...' : 'Enviar Respuesta'}</span>
@@ -214,7 +214,7 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
                           setRespondingId(null);
                           setRespuestaForm('');
                         }}
-                        className="flex items-center space-x-2 bg-gray-500/20 text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-500/30 transition-colors"
+                        className="flex items-center space-x-2 bg-gray-500/20 text-white px-4 py-2 rounded-lg hover:bg-gray-500/30 transition-colors"
                       >
                         <X className="w-4 h-4" />
                         <span>Cancelar</span>
@@ -225,7 +225,7 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
                   <div className="flex space-x-3">
                     <button
                       onClick={() => setRespondingId(ticket.id)}
-                      className="flex items-center space-x-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-colors"
+                      className="flex items-center space-x-2 bg-blue-500/20 text-white px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-colors"
                     >
                       <MessageSquare className="w-4 h-4" />
                       <span>Responder</span>
@@ -285,9 +285,9 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
                   </div>
                   
                   <button
-                    onClick={() => handleCerrar(ticket.id)}
+                    onClick={() => setShowCloseModal(ticket.id)}
                     disabled={processingId === ticket.id}
-                    className="flex items-center space-x-2 bg-green-500/20 text-green-300 px-3 py-2 rounded-lg hover:bg-green-500/30 transition-colors disabled:opacity-50"
+                    className="flex items-center space-x-2 bg-green-500/20 text-white px-3 py-2 rounded-lg hover:bg-green-500/30 transition-colors disabled:opacity-50"
                   >
                     <CheckCircle className="w-4 h-4" />
                     <span>{processingId === ticket.id ? 'Cerrando...' : 'Cerrar'}</span>
@@ -323,6 +323,34 @@ const TicketsList: React.FC<TicketsListProps> = ({ onStatsUpdate }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación para cerrar ticket */}
+      {showCloseModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Cerrar Ticket</h3>
+            <p className="text-gray-600 mb-6">
+              ¿Estás seguro de que deseas cerrar este ticket? Esta acción marcará el ticket como resuelto.
+            </p>
+            
+            <div className="flex space-x-4">
+              <button
+                onClick={() => handleCerrar(showCloseModal)}
+                disabled={processingId === showCloseModal}
+                className="flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processingId === showCloseModal ? 'Cerrando...' : 'Cerrar Ticket'}
+              </button>
+              <button
+                onClick={() => setShowCloseModal(null)}
+                className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
