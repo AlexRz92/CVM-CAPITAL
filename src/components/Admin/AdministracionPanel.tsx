@@ -36,8 +36,22 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
 
   const fetchEstadisticas = async () => {
     try {
-      // Obtener total de inversión
-      const { data: inversionData, error: inversionError } = await supabase.rpc('calcular_total_inversion_sistema');
+      // Calcular total de inversión sumando inversores y partners
+      const { data: inversoresData, error: inversoresError } = await supabase
+        .from('inversores')
+        .select('total');
+
+      const { data: partnersData, error: partnersError } = await supabase
+        .from('partners')
+        .select('inversion_inicial')
+        .eq('activo', true);
+
+      if (inversoresError) throw inversoresError;
+      if (partnersError) throw partnersError;
+
+      const totalInversores = inversoresData?.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0) || 0;
+      const totalPartners = partnersData?.reduce((sum, partner) => sum + (Number(partner.inversion_inicial) || 0), 0) || 0;
+      const totalInversion = totalInversores + totalPartners;
       
       // Obtener partners activos
       const { count: partnersCount } = await supabase
@@ -66,7 +80,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
         .maybeSingle();
 
       setEstadisticas({
-        total_inversion: inversionData || 0,
+        total_inversion: totalInversion,
         partners_activos: partnersCount || 0,
         total_inversores: inversoresCount || 0,
         semana_actual: semanaActual,
