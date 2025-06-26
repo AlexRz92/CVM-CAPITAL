@@ -66,7 +66,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
       borderColor: 'border-cyan-200/50'
     },
     {
-      title: 'Total',
+      title: 'Saldo Actual',
       value: formatCurrency(user.total),
       subtitle: 'Saldo disponible',
       icon: DollarSign,
