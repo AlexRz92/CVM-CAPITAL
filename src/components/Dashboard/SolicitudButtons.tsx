@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Copy, MessageCircle } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Copy, MessageCircle, HelpCircle } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -67,7 +67,7 @@ const SolicitudButtons: React.FC = () => {
 
       setShowDepositModal(false);
       setDepositAmount('');
-      setSuccessMessage('Estaremos validando su depósito, por favor espere un mínimo de 24H. De haber pasado 24H y no se refleje comuníquese por Email: pnf.alexisruiz@gmail.com o Telegram: @TheAlexRz92');
+      setSuccessMessage('Estaremos validando su depósito, por favor espere un mínimo de 24H. De haber pasado 24H y no se refleje, cree un ticket en el icono de ayuda');
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating deposit request:', error);
@@ -103,7 +103,7 @@ const SolicitudButtons: React.FC = () => {
 
       setShowWithdrawModal(false);
       setWithdrawAmount('');
-      setSuccessMessage('Estaremos validando su retiro, por favor espere un mínimo de 48H. De haber pasado 48H y no se refleje comuníquese por Email: pnf.alexisruiz@gmail.com o Telegram: @TheAlexRz92');
+      setSuccessMessage('Estaremos validando su retiro, por favor espere un mínimo de 48H. De haber pasado 48H y no se refleje, cree un ticket en el icono de ayuda');
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating withdraw request:', error);
@@ -275,31 +275,12 @@ const SolicitudButtons: React.FC = () => {
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Solicitud Enviada</h3>
             
-            <p className="text-gray-600 mb-6">{successMessage}</p>
-            
-            <div className="space-y-3 mb-6">
-              <button
-                onClick={() => copyToClipboard('pnf.alexisruiz@gmail.com')}
-                className="w-full flex items-center justify-center space-x-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-              >
-                <Copy className="w-5 h-5 text-blue-600" />
-                <span className="text-blue-600 font-medium">pnf.alexisruiz@gmail.com</span>
-              </button>
-
-              <button
-                onClick={openTelegram}
-                className="w-full flex items-center justify-center space-x-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-              >
-                <MessageCircle className="w-5 h-5 text-blue-600" />
-                <span className="text-blue-600 font-medium">Telegram: @TheAlexRz92</span>
-              </button>
-            </div>
-
-            {copyMessage && (
-              <div className="mb-4 p-2 bg-green-100 text-green-700 text-sm rounded-lg text-center">
-                {copyMessage}
+            <div className="flex items-start space-x-3 mb-6">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                <HelpCircle className="w-5 h-5 text-blue-600" />
               </div>
-            )}
+              <p className="text-gray-600">{successMessage}</p>
+            </div>
             
             <button
               onClick={() => setShowSuccessModal(false)}
