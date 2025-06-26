@@ -6,9 +6,9 @@ import InversoresList from './InversoresList';
 import AprobacionesList from './AprobacionesList';
 import PartnerAprobacionesList from './PartnerAprobacionesList';
 import AvisosList from './AvisosList';
-import ModeradoresList from './ModeradoresList';
+import TicketsList from './TicketsList';
 import AdministracionPanel from './AdministracionPanel';
-import { Users, CheckCircle, MessageSquare, UserPlus, Settings, UsersIcon } from 'lucide-react';
+import { Users, CheckCircle, MessageSquare, Settings, UsersIcon, HelpCircle } from 'lucide-react';
 
 const Operaciones: React.FC = () => {
   const { admin } = useAdmin();
@@ -18,7 +18,7 @@ const Operaciones: React.FC = () => {
     solicitudesPendientes: 0,
     solicitudesPartnersPendientes: 0,
     avisosActivos: 0,
-    moderadores: 0
+    ticketsPendientes: 0
   });
 
   useEffect(() => {
@@ -50,19 +50,18 @@ const Operaciones: React.FC = () => {
         .select('*', { count: 'exact', head: true })
         .eq('activo', true);
 
-      // Moderadores
-      const { count: moderadoresCount } = await supabase
-        .from('admins')
+      // Tickets pendientes
+      const { count: ticketsCount } = await supabase
+        .from('tickets')
         .select('*', { count: 'exact', head: true })
-        .eq('role', 'moderador')
-        .eq('is_active', true);
+        .eq('estado', 'abierto');
 
       setStats({
         totalInversores: inversoresCount || 0,
         solicitudesPendientes: solicitudesCount || 0,
         solicitudesPartnersPendientes: solicitudesPartnersCount || 0,
         avisosActivos: avisosCount || 0,
-        moderadores: moderadoresCount || 0
+        ticketsPendientes: ticketsCount || 0
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -73,9 +72,9 @@ const Operaciones: React.FC = () => {
     { id: 'inversores', label: 'Inversores', icon: Users, count: stats.totalInversores },
     { id: 'aprobaciones', label: 'Aprobaciones de Inversores', icon: CheckCircle, count: stats.solicitudesPendientes },
     { id: 'aprobaciones-socios', label: 'Aprobaciones Socios', icon: UsersIcon, count: stats.solicitudesPartnersPendientes },
+    { id: 'tickets', label: 'Tickets de Soporte', icon: HelpCircle, count: stats.ticketsPendientes },
     { id: 'avisos', label: 'Avisos', icon: MessageSquare, count: stats.avisosActivos },
     ...(admin?.role === 'admin' ? [
-      { id: 'moderadores', label: 'Moderadores', icon: UserPlus, count: stats.moderadores },
       { id: 'administracion', label: 'Administración', icon: Settings, count: 0 }
     ] : [])
   ];
@@ -124,8 +123,8 @@ const Operaciones: React.FC = () => {
           {activeTab === 'inversores' && <InversoresList onStatsUpdate={fetchStats} />}
           {activeTab === 'aprobaciones' && <AprobacionesList onStatsUpdate={fetchStats} />}
           {activeTab === 'aprobaciones-socios' && <PartnerAprobacionesList onStatsUpdate={fetchStats} />}
+          {activeTab === 'tickets' && <TicketsList onStatsUpdate={fetchStats} />}
           {activeTab === 'avisos' && <AvisosList onStatsUpdate={fetchStats} />}
-          {activeTab === 'moderadores' && admin?.role === 'admin' && <ModeradoresList onStatsUpdate={fetchStats} />}
           {activeTab === 'administracion' && admin?.role === 'admin' && <AdministracionPanel onStatsUpdate={fetchStats} />}
         </div>
       </main>

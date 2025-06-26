@@ -87,7 +87,7 @@ const Dashboard: React.FC = () => {
 
       {/* Componentes flotantes */}
       <ForexCalendar />
-      <HelpChat />
+      <HelpChat userId={user?.id} userType="inversor" />
     </div>
   );
 };

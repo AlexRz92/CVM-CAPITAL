@@ -184,7 +184,7 @@ const SocioDashboard: React.FC = () => {
 
       {/* Componentes flotantes */}
       <ForexCalendar />
-      <HelpChat />
+      <HelpChat userId={partner?.id} userType="partner" />
     </div>
   );
 };
