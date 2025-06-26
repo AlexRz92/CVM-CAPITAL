@@ -106,6 +106,21 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
     }).format(amount);
   };
 
+  // Manejar cambios en los campos con exclusión mutua
+  const handlePorcentajeChange = (value: string) => {
+    setFormData({
+      porcentaje: value,
+      ganancia_bruta: '' // Limpiar el otro campo
+    });
+  };
+
+  const handleGananciaBrutaChange = (value: string) => {
+    setFormData({
+      porcentaje: '', // Limpiar el otro campo
+      ganancia_bruta: value
+    });
+  };
+
   const handlePreview = async () => {
     if (!formData.porcentaje && !formData.ganancia_bruta) return;
 
@@ -122,16 +137,20 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
       const ganancia_partners = ganancia_bruta * ((100 - porcentajeInversores) / 100);
       const ganancia_inversores = ganancia_bruta * (porcentajeInversores / 100);
 
-      // Obtener distribución de partners
-      const { data: distribucionPartners, error: partnersError } = await supabase.rpc('obtener_distribucion_partners', {
-        p_ganancia_partners: ganancia_partners
+      // Obtener distribución de partners usando la función corregida
+      const { data: distribucionPartners, error: partnersError } = await supabase.rpc('obtener_distribucion_partners_preview', {
+        p_total_inversion: totalInversion,
+        p_porcentaje: formData.porcentaje ? parseFloat(formData.porcentaje) : null,
+        p_ganancia_bruta: formData.ganancia_bruta ? parseFloat(formData.ganancia_bruta) : null
       });
 
       if (partnersError) throw partnersError;
 
       // Obtener distribución de inversores
-      const { data: distribucionInversores, error: inversoresError } = await supabase.rpc('obtener_distribucion_inversores', {
-        p_ganancia_inversores: ganancia_inversores
+      const { data: distribucionInversores, error: inversoresError } = await supabase.rpc('obtener_distribucion_inversores_preview', {
+        p_total_inversion: totalInversion,
+        p_porcentaje: formData.porcentaje ? parseFloat(formData.porcentaje) : null,
+        p_ganancia_bruta: formData.ganancia_bruta ? parseFloat(formData.ganancia_bruta) : null
       });
 
       if (inversoresError) throw inversoresError;
@@ -259,7 +278,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
           </div>
         </div>
 
-        {/* Formulario */}
+        {/* Formulario con campos excluyentes */}
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -274,12 +293,17 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
                   min="0"
                   max="100"
                   value={formData.porcentaje}
-                  onChange={(e) => setFormData({...formData, porcentaje: e.target.value, ganancia_bruta: ''})}
-                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/50 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  placeholder="Ej: 5.5"
+                  onChange={(e) => handlePorcentajeChange(e.target.value)}
                   disabled={!!formData.ganancia_bruta}
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/50 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Ej: 5.5"
                 />
               </div>
+              {formData.ganancia_bruta && (
+                <p className="text-yellow-300 text-xs mt-1">
+                  Deshabilitado porque se ingresó cantidad fija
+                </p>
+              )}
             </div>
 
             <div>
@@ -293,12 +317,17 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
                   step="0.01"
                   min="0"
                   value={formData.ganancia_bruta}
-                  onChange={(e) => setFormData({...formData, ganancia_bruta: e.target.value, porcentaje: ''})}
-                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/50 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  placeholder="Ej: 5000"
+                  onChange={(e) => handleGananciaBrutaChange(e.target.value)}
                   disabled={!!formData.porcentaje}
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/50 rounded-lg text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Ej: 5000"
                 />
               </div>
+              {formData.porcentaje && (
+                <p className="text-yellow-300 text-xs mt-1">
+                  Deshabilitado porque se ingresó porcentaje
+                </p>
+              )}
             </div>
           </div>
 
@@ -332,6 +361,9 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
             <div className="bg-white/10 rounded-lg p-4 border border-white/20">
               <h4 className="text-white/80 text-sm font-medium mb-2">Ganancia Bruta</h4>
               <p className="text-2xl font-bold text-green-300">{formatCurrency(previewData.ganancia_bruta)}</p>
+              <p className="text-white/60 text-xs mt-1">
+                {formData.porcentaje ? `${formData.porcentaje}% del total` : 'Cantidad fija ingresada'}
+              </p>
             </div>
 
             <div className="bg-white/10 rounded-lg p-4 border border-white/20">
@@ -369,16 +401,9 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
                           {formatCurrency(partner.ganancia_total)}
                         </p>
                         <div className="text-white/70 text-sm">
-                          {partner.tipo === 'operador_partner' ? (
-                            <>
-                              <span className="block">Operador: {formatCurrency(partner.ganancia_operador)}</span>
-                              <span className="block">Comisión: {formatCurrency(partner.ganancia_comision)}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="block">Propia: {formatCurrency(partner.ganancia_operador)}</span>
-                              <span className="block">Comisión: {formatCurrency(partner.ganancia_comision)}</span>
-                            </>
+                          <span className="block">Ganancia: {formatCurrency(partner.ganancia_comision)}</span>
+                          {partner.ganancia_operador > 0 && (
+                            <span className="block">Operador: {formatCurrency(partner.ganancia_operador)}</span>
                           )}
                         </div>
                       </div>
@@ -412,7 +437,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
                           {formatCurrency(inversor.ganancia_individual)}
                         </p>
                         <p className="text-white/60 text-xs">
-                          {inversor.porcentaje_ganancia}% × {inversor.porcentaje_inversor}%
+                          {porcentajeInversores}% de 5%
                         </p>
                       </div>
                     </div>
@@ -427,7 +452,7 @@ const GananciasProcessor: React.FC<GananciasProcessorProps> = ({ totalInversion,
             <h4 className="text-yellow-300 font-semibold mb-2">Cálculo Detallado</h4>
             <ul className="text-yellow-200 text-sm space-y-1">
               <li>• <strong>Partners + Operadores:</strong> Reciben 100% de su ganancia propia + 100% del {100 - porcentajeInversores}% de sus inversores</li>
-              <li>• <strong>Partners normales:</strong> Reciben {porcentajeInversores}% de su ganancia propia + su % de comisión del {100 - porcentajeInversores}% de sus inversores</li>
+              <li>• <strong>Partners normales:</strong> Reciben 80% de su ganancia propia + 1/3 del {100 - porcentajeInversores}% de sus inversores</li>
               <li>• <strong>Inversores:</strong> Reciben {porcentajeInversores}% de su ganancia (5% de su inversión)</li>
               <li>• <strong>Distribución:</strong> {porcentajeInversores}% para inversores, {100 - porcentajeInversores}% para partners</li>
             </ul>
