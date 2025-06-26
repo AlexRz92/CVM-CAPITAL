@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../config/supabase';
 import { useAdmin } from '../../contexts/AdminContext';
-import { Users, Plus, Edit, Trash2, UserCheck, UserX, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, UserCheck, UserX, Eye, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import CryptoJS from 'crypto-js';
 import PasswordStrengthIndicator from '../UI/PasswordStrengthIndicator';
 
@@ -11,8 +11,6 @@ interface Partner {
   email: string;
   username?: string;
   tipo: 'partner' | 'operador_partner';
-  porcentaje_comision: number;
-  porcentaje_especial: number;
   inversion_inicial: number;
   activo: boolean;
   created_at: string;
@@ -59,6 +57,8 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showResumenModal, setShowResumenModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
+  const [deleteInfo, setDeleteInfo] = useState<any>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
   const [viewingPartnerId, setViewingPartnerId] = useState<string>('');
@@ -67,14 +67,13 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
   const [showPasswordStrength, setShowPasswordStrength] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
     username: '',
     password: '',
     tipo: 'partner' as 'partner' | 'operador_partner',
-    porcentaje_comision: 0,
-    porcentaje_especial: 0,
     inversion_inicial: 0
   });
 
@@ -103,21 +102,20 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
 
     setCheckingUsername(true);
     try {
-      // Verificar en partners - usar maybeSingle() para manejar 0 resultados
+      // Verificar en partners
       const { data: partnerData, error: partnerError } = await supabase
         .from('partners')
         .select('id')
         .eq('username', username)
         .maybeSingle();
 
-      // Verificar en admins - usar maybeSingle() para manejar 0 resultados
+      // Verificar en admins
       const { data: adminData, error: adminError } = await supabase
         .from('admins')
         .select('id')
         .eq('username', username)
         .maybeSingle();
 
-      // Si hay errores diferentes a "no rows found", mostrar error
       if (partnerError && partnerError.code !== 'PGRST116') {
         console.error('Error checking username in partners:', partnerError);
         setUsernameAvailable(false);
@@ -130,7 +128,6 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
         return;
       }
 
-      // El username está disponible si no se encontró en ninguna tabla
       const isAvailable = !partnerData && !adminData;
       setUsernameAvailable(isAvailable);
     } catch (error) {
@@ -205,8 +202,6 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
           nombre: formData.nombre,
           email: formData.email,
           tipo: formData.tipo,
-          porcentaje_comision: formData.porcentaje_comision,
-          porcentaje_especial: formData.porcentaje_especial,
           inversion_inicial: formData.inversion_inicial
         };
 
@@ -237,8 +232,6 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
             password_hash: hashedPassword,
             password_salt: salt,
             tipo: formData.tipo,
-            porcentaje_comision: formData.porcentaje_comision,
-            porcentaje_especial: formData.porcentaje_especial,
             inversion_inicial: formData.inversion_inicial,
             created_by: admin?.id
           });
@@ -263,8 +256,6 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
       username: '',
       password: '',
       tipo: 'partner',
-      porcentaje_comision: 0,
-      porcentaje_especial: 0,
       inversion_inicial: 0
     });
     setShowPasswordStrength(false);
@@ -279,44 +270,58 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
       username: partner.username || '',
       password: '', // No mostrar contraseña actual
       tipo: partner.tipo,
-      porcentaje_comision: partner.porcentaje_comision,
-      porcentaje_especial: partner.porcentaje_especial,
       inversion_inicial: partner.inversion_inicial
     });
     setShowModal(true);
   };
 
-  const handleTipoChange = (newTipo: 'partner' | 'operador_partner') => {
-    setFormData(prev => ({
-      ...prev,
-      tipo: newTipo,
-      porcentaje_especial: newTipo === 'partner' ? 0 : prev.porcentaje_especial
-    }));
+  const handleDeleteClick = async (id: string) => {
+    try {
+      const { data, error } = await supabase.rpc('validar_eliminacion_partner', {
+        p_partner_id: id
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setDeleteInfo(data[0]);
+        setShowDeleteModal(id);
+      }
+    } catch (error) {
+      console.error('Error validating partner deletion:', error);
+      alert('Error al validar la eliminación del partner');
+    }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este partner? Los inversores asignados serán liberados.')) return;
+  const handleDelete = async () => {
+    if (!showDeleteModal) return;
     
+    setDeleting(true);
     try {
       // Primero liberar los inversores asignados
       await supabase
         .from('partner_inversores')
         .delete()
-        .eq('partner_id', id);
+        .eq('partner_id', showDeleteModal);
 
       // Luego eliminar el partner
       const { error } = await supabase
         .from('partners')
         .delete()
-        .eq('id', id);
+        .eq('id', showDeleteModal);
 
       if (error) throw error;
       
+      setShowDeleteModal(null);
+      setDeleteInfo(null);
       fetchPartners();
       fetchInversores(); // Actualizar lista de inversores disponibles
       onUpdate();
     } catch (error) {
       console.error('Error deleting partner:', error);
+      alert('Error al eliminar el partner');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -489,14 +494,6 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
                           {partner.tipo === 'operador_partner' ? 'OPERADOR + PARTNER' : 'PARTNER'}
                         </span>
                         <span className="text-white/60 text-xs">
-                          Comisión: {partner.porcentaje_comision}%
-                        </span>
-                        {partner.porcentaje_especial > 0 && (
-                          <span className="text-white/60 text-xs">
-                            Operador: {partner.porcentaje_especial}%
-                          </span>
-                        )}
-                        <span className="text-white/60 text-xs">
                           Inversión: {formatCurrency(partner.inversion_inicial)}
                         </span>
                       </div>
@@ -541,7 +538,7 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
                     </button>
                     
                     <button
-                      onClick={() => handleDelete(partner.id)}
+                      onClick={() => handleDeleteClick(partner.id)}
                       className="p-2 text-red-300 hover:bg-red-500/20 rounded transition-colors"
                       title="Eliminar"
                     >
@@ -665,11 +662,11 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
                 </label>
                 <select
                   value={formData.tipo}
-                  onChange={(e) => handleTipoChange(e.target.value as 'partner' | 'operador_partner')}
+                  onChange={(e) => setFormData({...formData, tipo: e.target.value as 'partner' | 'operador_partner'})}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="partner">Partner</option>
-                  <option value="operador_partner">Partner + Operador</option>
+                  <option value="partner">Partner (80% propia + 1/3 comisión)</option>
+                  <option value="operador_partner">Partner + Operador (100% propia + 100% comisión + 50% adicional)</option>
                 </select>
               </div>
 
@@ -681,49 +678,14 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
                   type="number"
                   step="0.01"
                   min="0"
+                  max="999999999999.99"
                   value={formData.inversion_inicial}
                   onFocus={() => handleFieldFocus('inversion_inicial')}
                   onBlur={(e) => handleFieldBlur('inversion_inicial', e.target.value)}
                   onChange={(e) => setFormData({...formData, inversion_inicial: parseFloat(e.target.value) || 0})}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 text-sm font-medium mb-2">
-                    % Comisión Partner
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.porcentaje_comision}
-                    onFocus={() => handleFieldFocus('porcentaje_comision')}
-                    onBlur={(e) => handleFieldBlur('porcentaje_comision', e.target.value)}
-                    onChange={(e) => setFormData({...formData, porcentaje_comision: parseFloat(e.target.value) || 0})}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-gray-700 text-sm font-medium mb-2">
-                    % Operador
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={formData.porcentaje_especial}
-                    onFocus={() => handleFieldFocus('porcentaje_especial')}
-                    onBlur={(e) => handleFieldBlur('porcentaje_especial', e.target.value)}
-                    onChange={(e) => setFormData({...formData, porcentaje_especial: parseFloat(e.target.value) || 0})}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={formData.tipo === 'partner'}
-                  />
-                </div>
+                <p className="text-xs text-gray-500 mt-1">Máximo 2 decimales</p>
               </div>
               
               <div className="flex space-x-4 pt-4">
@@ -751,6 +713,64 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
         </div>
       )}
 
+      {/* Modal de confirmación de eliminación */}
+      {showDeleteModal && deleteInfo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center space-x-3 mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+              <h3 className="text-xl font-bold text-gray-900">Confirmar Eliminación</h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">{deleteInfo.mensaje}</p>
+              
+              {deleteInfo.total_inversores > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                    <span className="font-medium text-yellow-800">Advertencia</span>
+                  </div>
+                  <p className="text-yellow-700 text-sm">
+                    Los {deleteInfo.total_inversores} inversores asignados serán liberados y podrán ser reasignados a otros partners.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex space-x-4">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Eliminando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Eliminar Partner</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(null);
+                  setDeleteInfo(null);
+                }}
+                disabled={deleting}
+                className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de asignar inversores */}
       {showAssignModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -770,7 +790,7 @@ const PartnersManager: React.FC<PartnersManagerProps> = ({ onUpdate }) => {
                 <option value="">Seleccionar partner...</option>
                 {partners.filter(p => p.activo).map(partner => (
                   <option key={partner.id} value={partner.id}>
-                    {partner.nombre} ({partner.tipo})
+                    {partner.nombre} ({partner.tipo === 'operador_partner' ? 'Operador+Partner' : 'Partner'})
                   </option>
                 ))}
               </select>
