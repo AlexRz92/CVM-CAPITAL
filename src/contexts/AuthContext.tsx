@@ -220,7 +220,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Pregunta y respuesta de seguridad son requeridas' };
       }
 
+      // Verificar conexión a Supabase
+      console.log('Verificando conexión a Supabase...');
+      const { data: testConnection, error: connectionError } = await supabase
+        .from('configuracion_sistema')
+        .select('id')
+        .limit(1);
+
+      if (connectionError) {
+        console.error('Error de conexión a Supabase:', connectionError);
+        return { success: false, error: 'Error de conexión a la base de datos. Verifica tu conexión a internet.' };
+      }
+
+      console.log('Conexión a Supabase exitosa');
+
       // Verificar si el email ya existe
+      console.log('Verificando si el email ya existe...');
       const { data: existingUser, error: checkError } = await supabase
         .from('inversores')
         .select('id')
@@ -236,9 +251,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'Este correo ya está registrado' };
       }
 
+      console.log('Email disponible, procediendo con el registro...');
+
       // Generar salt y hashear contraseña
       const salt = generateSalt();
       const hashedPassword = hashPassword(userData.password, salt);
+
+      console.log('Insertando nuevo usuario...');
 
       // Insertar nuevo usuario
       const { data: newUser, error: insertError } = await supabase
@@ -264,12 +283,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let errorMessage = 'Error al registrar usuario';
         if (insertError.code === '23505') {
           errorMessage = 'Este correo ya está registrado';
+        } else if (insertError.message) {
+          errorMessage = `Error: ${insertError.message}`;
         }
         
         return { success: false, error: errorMessage };
       }
 
-      console.log('Usuario registrado exitosamente');
+      console.log('Usuario registrado exitosamente:', newUser);
       
       // Auto-login después del registro
       const loginResult = await login(sanitizedEmail, userData.password);
@@ -278,7 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
     } catch (error: any) {
       console.error('Error general en register:', error);
-      return { success: false, error: 'Error de conexión. Inténtalo más tarde.' };
+      return { success: false, error: `Error de conexión: ${error.message || 'Inténtalo más tarde.'}` };
     }
   };
 

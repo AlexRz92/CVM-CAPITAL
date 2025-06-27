@@ -1,9 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://obdfdnlmzowenrowxexz.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZGZkbmxtem93ZW5yb3d4ZXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4NjgxODMsImV4cCI6MjA2NjQ0NDE4M30.j0MxECluqvu12pG36N7MkUgmvTxSciIkH8FqSOgg-QE';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://obdfdnlmzowenrowxexz.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9iZGZkbmxtem93ZW5yb3d4ZXh6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4NjgxODMsImV4cCI6MjA2NjQ0NDE4M30.j0MxECluqvu12pG36N7MkUgmvTxSciIkH8FqSOgg-QE';
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  }
+});
 
 export type Database = {
   public: {
