@@ -150,18 +150,31 @@ const TransaccionesManager: React.FC<TransaccionesManagerProps> = ({
 
   const getTransactionColor = (tipo: string) => {
     switch (tipo.toLowerCase()) {
-      case 'deposito':
-      case 'depósito':
+      case 'deposito': // Solo esta forma
         return 'text-green-300';
       case 'retiro':
         return 'text-red-300';
       case 'ganancia':
         return 'text-blue-300';
-      case 'reinversion':
-      case 'reinversión':
+      case 'reinversion': // Solo esta forma
         return 'text-yellow-300';
       default:
         return 'text-white';
+    }
+  };
+
+  const getDisplayName = (tipo: string) => {
+    switch (tipo.toLowerCase()) {
+      case 'deposito':
+        return 'Depósito';
+      case 'retiro':
+        return 'Retiro';
+      case 'reinversion':
+        return 'Reinversión';
+      case 'ganancia':
+        return 'Ganancia';
+      default:
+        return tipo.charAt(0).toUpperCase() + tipo.slice(1);
     }
   };
 
@@ -293,8 +306,8 @@ const TransaccionesManager: React.FC<TransaccionesManagerProps> = ({
                         <span className={`font-semibold ${getTransactionColor(transaccion.tipo)}`}>
                           {formatCurrency(transaccion.monto)}
                         </span>
-                        <span className="text-white/80 capitalize">
-                          {transaccion.tipo}
+                        <span className="text-white/80">
+                          {getDisplayName(transaccion.tipo)}
                         </span>
                       </div>
                       <div className="flex items-center space-x-3 text-sm text-white/60">

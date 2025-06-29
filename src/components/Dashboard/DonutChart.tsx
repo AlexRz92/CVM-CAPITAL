@@ -28,22 +28,20 @@ const DonutChart: React.FC<DonutChartProps> = () => {
 
       if (error) throw error;
 
-      // Calcular totales por tipo
+      // Calcular totales por tipo (solo usar palabras sin acentos)
       let depositos = 0;
       let retiros = 0;
       let reinversiones = 0;
 
       transactions?.forEach(transaction => {
         switch (transaction.tipo.toLowerCase()) {
-          case 'deposito':
-          case 'depósito':
+          case 'deposito': // Solo esta forma
             depositos += Number(transaction.monto);
             break;
           case 'retiro':
             retiros += Number(transaction.monto);
             break;
-          case 'reinversion':
-          case 'reinversión':
+          case 'reinversion': // Solo esta forma
             reinversiones += Number(transaction.monto);
             break;
         }

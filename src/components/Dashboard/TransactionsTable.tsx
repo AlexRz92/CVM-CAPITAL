@@ -34,10 +34,8 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
       case 'retiro':
         return <ArrowDownCircle className="w-5 h-5 text-red-400" />;
       case 'deposito':
-      case 'depósito':
         return <ArrowUpCircle className="w-5 h-5 text-green-400" />;
       case 'reinversion':
-      case 'reinversión':
         return <RefreshCw className="w-5 h-5 text-blue-400" />;
       default:
         return <ArrowUpCircle className="w-5 h-5 text-gray-400" />;
@@ -49,13 +47,26 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
       case 'retiro':
         return 'text-red-400';
       case 'deposito':
-      case 'depósito':
         return 'text-green-400';
       case 'reinversion':
-      case 'reinversión':
         return 'text-blue-400';
       default:
         return 'text-gray-300';
+    }
+  };
+
+  const getDisplayName = (tipo: string) => {
+    switch (tipo.toLowerCase()) {
+      case 'deposito':
+        return 'Depósito';
+      case 'retiro':
+        return 'Retiro';
+      case 'reinversion':
+        return 'Reinversión';
+      case 'ganancia':
+        return 'Ganancia';
+      default:
+        return tipo.charAt(0).toUpperCase() + tipo.slice(1);
     }
   };
 
@@ -86,8 +97,8 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
                   <td className="py-4 px-4">
                     <div className="flex items-center space-x-3">
                       {getTransactionIcon(transaction.tipo)}
-                      <span className="text-white font-medium capitalize">
-                        {transaction.tipo}
+                      <span className="text-white font-medium">
+                        {getDisplayName(transaction.tipo)}
                       </span>
                     </div>
                   </td>
