@@ -3,7 +3,8 @@ import { supabase } from '../../config/supabase';
 import { useAdmin } from '../../contexts/AdminContext';
 import PartnersManager from './PartnersManager';
 import GananciasProcessor from './GananciasProcessor';
-import { DollarSign, Users, TrendingUp, Calendar, Settings, Save } from 'lucide-react';
+import ModeradoresList from './ModeradoresList';
+import { DollarSign, Users, TrendingUp, Calendar, Settings, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface AdministracionPanelProps {
   onStatsUpdate: () => void;
@@ -26,6 +27,9 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
   });
   const [configLoading, setConfigLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [inconsistencias, setInconsistencias] = useState<any[]>([]);
+  const [showInconsistencias, setShowInconsistencias] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
 
   useEffect(() => {
     fetchEstadisticas();
@@ -36,33 +40,18 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
 
   const fetchEstadisticas = async () => {
     try {
-      // Calcular total de inversión sumando inversores y partners
-      const { data: inversoresData, error: inversoresError } = await supabase
-        .from('inversores')
-        .select('total');
+      // Usar la nueva función optimizada
+      const { data: totalesData, error: totalesError } = await supabase.rpc('obtener_total_inversion_sistema');
 
-      const { data: partnersData, error: partnersError } = await supabase
-        .from('partners')
-        .select('inversion_inicial')
-        .eq('activo', true);
+      if (totalesError) throw totalesError;
 
-      if (inversoresError) throw inversoresError;
-      if (partnersError) throw partnersError;
-
-      const totalInversores = inversoresData?.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0) || 0;
-      const totalPartners = partnersData?.reduce((sum, partner) => sum + (Number(partner.inversion_inicial) || 0), 0) || 0;
-      const totalInversion = totalInversores + totalPartners;
-      
-      // Obtener partners activos
-      const { count: partnersCount } = await supabase
-        .from('partners')
-        .select('*', { count: 'exact', head: true })
-        .eq('activo', true);
-
-      // Obtener total inversores
-      const { count: inversoresCount } = await supabase
-        .from('inversores')
-        .select('*', { count: 'exact', head: true });
+      const totales = totalesData?.[0] || {
+        total_inversores: 0,
+        total_partners: 0,
+        total_sistema: 0,
+        count_inversores: 0,
+        count_partners: 0
+      };
 
       // Obtener semana actual
       const { data: semanaData, error: semanaError } = await supabase
@@ -80,9 +69,9 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
         .maybeSingle();
 
       setEstadisticas({
-        total_inversion: totalInversion,
-        partners_activos: partnersCount || 0,
-        total_inversores: inversoresCount || 0,
+        total_inversion: totales.total_sistema,
+        partners_activos: totales.count_partners,
+        total_inversores: totales.count_inversores,
         semana_actual: semanaActual,
         ganancia_semanal_actual: gananciaData?.ganancia_bruta || 0
       });
@@ -113,6 +102,36 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
       });
     } catch (error) {
       console.error('Error fetching configuration:', error);
+    }
+  };
+
+  const validarConsistencia = async () => {
+    try {
+      const { data, error } = await supabase.rpc('validar_consistencia_datos');
+      if (error) throw error;
+      
+      setInconsistencias(data || []);
+      setShowInconsistencias(true);
+    } catch (error) {
+      console.error('Error validating consistency:', error);
+      alert('Error al validar consistencia de datos');
+    }
+  };
+
+  const sincronizarTotales = async () => {
+    setSincronizando(true);
+    try {
+      const { data, error } = await supabase.rpc('sincronizar_totales_sistema');
+      if (error) throw error;
+      
+      alert(`Sincronización completada: ${data}`);
+      fetchEstadisticas();
+      onStatsUpdate();
+    } catch (error) {
+      console.error('Error synchronizing totals:', error);
+      alert('Error al sincronizar totales');
+    } finally {
+      setSincronizando(false);
     }
   };
 
@@ -151,6 +170,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
     { id: 'resumen', label: 'Resumen General', icon: DollarSign },
     { id: 'partners', label: 'Gestión de Partners', icon: Users },
     { id: 'ganancias', label: 'Procesar Ganancias', icon: TrendingUp },
+    { id: 'moderadores', label: 'Moderadores', icon: Users },
     { id: 'configuracion', label: 'Configuración', icon: Settings }
   ];
 
@@ -179,10 +199,31 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
       {/* Contenido de las secciones */}
       {activeSection === 'resumen' && (
         <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-cyan-200/30">
-          <h3 className="text-xl font-bold text-white mb-6 flex items-center">
-            <DollarSign className="w-6 h-6 mr-3" />
-            Resumen General del Sistema
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white flex items-center">
+              <DollarSign className="w-6 h-6 mr-3" />
+              Resumen General del Sistema
+            </h3>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={validarConsistencia}
+                className="flex items-center space-x-2 bg-yellow-500/20 text-yellow-300 px-4 py-2 rounded-lg hover:bg-yellow-500/30 transition-colors"
+              >
+                <AlertTriangle className="w-4 h-4" />
+                <span>Validar Datos</span>
+              </button>
+              
+              <button
+                onClick={sincronizarTotales}
+                disabled={sincronizando}
+                className="flex items-center space-x-2 bg-blue-500/20 text-blue-300 px-4 py-2 rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${sincronizando ? 'animate-spin' : ''}`} />
+                <span>{sincronizando ? 'Sincronizando...' : 'Sincronizar'}</span>
+              </button>
+            </div>
+          </div>
           
           {loading ? (
             <div className="flex items-center justify-center h-32">
@@ -199,7 +240,7 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
                 <h4 className="text-white font-semibold mb-2">Total en Inversión</h4>
                 <p className="text-2xl font-bold text-green-300">{formatCurrency(estadisticas.total_inversion)}</p>
                 <p className="text-white/70 text-sm mt-2">
-                  Suma de inversores + partners
+                  Suma optimizada de inversores + partners
                 </p>
               </div>
 
@@ -276,6 +317,13 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
         />
       )}
 
+      {activeSection === 'moderadores' && (
+        <ModeradoresList onStatsUpdate={() => {
+          fetchEstadisticas();
+          onStatsUpdate();
+        }} />
+      )}
+
       {activeSection === 'configuracion' && (
         <div className="space-y-6">
           {/* Configuración de Semanas */}
@@ -343,6 +391,78 @@ const AdministracionPanel: React.FC<AdministracionPanelProps> = ({ onStatsUpdate
                 <span>{configLoading ? 'Guardando...' : 'Guardar Configuración'}</span>
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de inconsistencias */}
+      {showInconsistencias && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Validación de Consistencia de Datos</h3>
+            
+            {inconsistencias.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <RefreshCw className="w-8 h-8 text-green-600" />
+                </div>
+                <p className="text-green-600 font-semibold">¡Todos los datos están consistentes!</p>
+                <p className="text-gray-600 text-sm mt-2">No se encontraron discrepancias en los cálculos.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-yellow-800 font-semibold">
+                    Se encontraron {inconsistencias.length} inconsistencias en los datos:
+                  </p>
+                </div>
+                
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left p-3">Inversor</th>
+                        <th className="text-right p-3">Total Actual</th>
+                        <th className="text-right p-3">Total Calculado</th>
+                        <th className="text-right p-3">Diferencia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inconsistencias.map((item, index) => (
+                        <tr key={index} className="border-b">
+                          <td className="p-3">{item.nombre} {item.apellido}</td>
+                          <td className="text-right p-3">{formatCurrency(item.total_actual)}</td>
+                          <td className="text-right p-3">{formatCurrency(item.total_calculado)}</td>
+                          <td className={`text-right p-3 font-semibold ${
+                            item.diferencia > 0 ? 'text-red-600' : 'text-blue-600'
+                          }`}>
+                            {formatCurrency(item.diferencia)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex space-x-4 mt-6">
+              {inconsistencias.length > 0 && (
+                <button
+                  onClick={sincronizarTotales}
+                  disabled={sincronizando}
+                  className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+                >
+                  {sincronizando ? 'Corrigiendo...' : 'Corregir Inconsistencias'}
+                </button>
+              )}
+              <button
+                onClick={() => setShowInconsistencias(false)}
+                className="bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

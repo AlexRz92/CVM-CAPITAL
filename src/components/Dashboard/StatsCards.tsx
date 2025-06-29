@@ -25,7 +25,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
 
   const fetchInversionTotal = async () => {
     try {
-      const { data, error } = await supabase.rpc('calcular_inversion_total_inversor', {
+      // Usar la nueva función optimizada
+      const { data, error } = await supabase.rpc('calcular_total_real_inversor', {
         p_inversor_id: user.id
       });
 
@@ -33,7 +34,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({ user }) => {
       setInversionTotal(data || 0);
     } catch (error) {
       console.error('Error fetching total investment:', error);
-      setInversionTotal(user.capital_inicial);
+      // Fallback al total actual del usuario
+      setInversionTotal(user.total);
     } finally {
       setLoading(false);
     }
