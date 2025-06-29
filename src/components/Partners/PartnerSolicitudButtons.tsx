@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Copy, MessageCircle, HelpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Copy, MessageCircle, HelpCircle, Clock, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../config/supabase';
 import { usePartner } from '../../contexts/PartnerContext';
+
+interface SolicitudPendiente {
+  tipo: string;
+  monto: number;
+  fecha_solicitud: string;
+  dias_pendiente: number;
+}
 
 const PartnerSolicitudButtons: React.FC = () => {
   const { partner } = usePartner();
@@ -13,6 +20,32 @@ const PartnerSolicitudButtons: React.FC = () => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState<SolicitudPendiente[]>([]);
+  const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
+
+  useEffect(() => {
+    if (partner) {
+      fetchSolicitudesPendientes();
+    }
+  }, [partner]);
+
+  const fetchSolicitudesPendientes = async () => {
+    if (!partner) return;
+    
+    setLoadingSolicitudes(true);
+    try {
+      const { data, error } = await supabase.rpc('obtener_solicitudes_pendientes_partner', {
+        p_partner_id: partner.id
+      });
+
+      if (error) throw error;
+      setSolicitudesPendientes(data || []);
+    } catch (error) {
+      console.error('Error fetching pending requests:', error);
+    } finally {
+      setLoadingSolicitudes(false);
+    }
+  };
 
   const handleDepositSubmit = async () => {
     if (!partner || !depositAmount) return;
@@ -22,22 +55,27 @@ const PartnerSolicitudButtons: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('partner_solicitudes')
-        .insert({
-          partner_id: partner.id,
-          tipo: 'deposito',
-          monto: amount
-        });
+      const { data, error } = await supabase.rpc('crear_solicitud_partner', {
+        p_partner_id: partner.id,
+        p_tipo: 'deposito',
+        p_monto: amount
+      });
 
       if (error) throw error;
 
-      setShowDepositModal(false);
-      setDepositAmount('');
-      setSuccessMessage('Estaremos validando su depósito, por favor espere un mínimo de 24H. De haber pasado 24H y no se refleje, cree un ticket en el icono de ayuda');
-      setShowSuccessModal(true);
+      const result = data[0];
+      if (result.success) {
+        setShowDepositModal(false);
+        setDepositAmount('');
+        setSuccessMessage('Solicitud de depósito enviada exitosamente. Estaremos validando tu depósito, por favor espera un mínimo de 24H.');
+        setShowSuccessModal(true);
+        fetchSolicitudesPendientes(); // Actualizar lista de pendientes
+      } else {
+        alert(result.message);
+      }
     } catch (error) {
       console.error('Error creating deposit request:', error);
+      alert('Error al crear la solicitud. Inténtalo más tarde.');
     } finally {
       setLoading(false);
     }
@@ -51,22 +89,27 @@ const PartnerSolicitudButtons: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('partner_solicitudes')
-        .insert({
-          partner_id: partner.id,
-          tipo: 'retiro',
-          monto: amount
-        });
+      const { data, error } = await supabase.rpc('crear_solicitud_partner', {
+        p_partner_id: partner.id,
+        p_tipo: 'retiro',
+        p_monto: amount
+      });
 
       if (error) throw error;
 
-      setShowWithdrawModal(false);
-      setWithdrawAmount('');
-      setSuccessMessage('Estaremos validando su retiro, por favor espere un mínimo de 48H. De haber pasado 48H y no se refleje, cree un ticket en el icono de ayuda');
-      setShowSuccessModal(true);
+      const result = data[0];
+      if (result.success) {
+        setShowWithdrawModal(false);
+        setWithdrawAmount('');
+        setSuccessMessage('Solicitud de retiro enviada exitosamente. Estaremos validando tu retiro, por favor espera un mínimo de 48H.');
+        setShowSuccessModal(true);
+        fetchSolicitudesPendientes(); // Actualizar lista de pendientes
+      } else {
+        alert(result.message);
+      }
     } catch (error) {
       console.error('Error creating withdraw request:', error);
+      alert('Error al crear la solicitud. Inténtalo más tarde.');
     } finally {
       setLoading(false);
     }
@@ -82,34 +125,131 @@ const PartnerSolicitudButtons: React.FC = () => {
     window.open('https://t.me/TheAlexRz92', '_blank');
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-ES', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getSolicitudPendiente = (tipo: string) => {
+    return solicitudesPendientes.find(s => s.tipo === tipo);
+  };
+
+  const depositoPendiente = getSolicitudPendiente('deposito');
+  const retiroPendiente = getSolicitudPendiente('retiro');
+
   return (
     <>
+      {/* Mostrar solicitudes pendientes */}
+      {!loadingSolicitudes && solicitudesPendientes.length > 0 && (
+        <div className="bg-yellow-500/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-yellow-200/30 mb-6">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center">
+            <Clock className="w-5 h-5 mr-2 text-yellow-300" />
+            Solicitudes Pendientes
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {solicitudesPendientes.map((solicitud, index) => (
+              <div key={index} className="bg-white/10 rounded-lg p-4 border border-white/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-semibold capitalize">
+                    {solicitud.tipo === 'deposito' ? 'Depósito' : 'Retiro'}
+                  </span>
+                  <span className="text-yellow-300 font-bold">
+                    {formatCurrency(solicitud.monto)}
+                  </span>
+                </div>
+                <div className="text-white/70 text-sm">
+                  <p>Enviado: {formatDate(solicitud.fecha_solicitud)}</p>
+                  <p>Hace {solicitud.dias_pendiente} día(s)</p>
+                </div>
+                <div className="mt-2 flex items-center text-yellow-200 text-xs">
+                  <AlertTriangle className="w-4 h-4 mr-1" />
+                  <span>En proceso de validación</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Botones de Solicitud */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <button
           onClick={() => setShowDepositModal(true)}
-          className="bg-green-500/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-green-200/30 hover:scale-105 transition-all duration-300 group"
+          disabled={!!depositoPendiente}
+          className={`backdrop-blur-lg rounded-2xl p-6 shadow-2xl border transition-all duration-300 group ${
+            depositoPendiente 
+              ? 'bg-gray-500/20 border-gray-400/30 cursor-not-allowed opacity-60'
+              : 'bg-green-500/20 border-green-200/30 hover:scale-105'
+          }`}
         >
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-              <ArrowUpCircle className="w-8 h-8 text-white" />
+            <div className={`w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-transform ${
+              depositoPendiente 
+                ? 'bg-gray-400'
+                : 'bg-gradient-to-br from-green-400 to-green-600 group-hover:scale-110'
+            }`}>
+              {depositoPendiente ? (
+                <Clock className="w-8 h-8 text-white" />
+              ) : (
+                <ArrowUpCircle className="w-8 h-8 text-white" />
+              )}
             </div>
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">Solicitar Depósito</h3>
-          <p className="text-green-200 text-sm">Envía una solicitud de depósito para aumentar tu inversión</p>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {depositoPendiente ? 'Depósito Pendiente' : 'Solicitar Depósito'}
+          </h3>
+          <p className={`text-sm ${depositoPendiente ? 'text-gray-300' : 'text-green-200'}`}>
+            {depositoPendiente 
+              ? `Tienes un depósito de ${formatCurrency(depositoPendiente.monto)} en proceso`
+              : 'Envía una solicitud de depósito para aumentar tu inversión'
+            }
+          </p>
         </button>
 
         <button
           onClick={() => setShowWithdrawModal(true)}
-          className="bg-red-500/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-red-200/30 hover:scale-105 transition-all duration-300 group"
+          disabled={!!retiroPendiente}
+          className={`backdrop-blur-lg rounded-2xl p-6 shadow-2xl border transition-all duration-300 group ${
+            retiroPendiente 
+              ? 'bg-gray-500/20 border-gray-400/30 cursor-not-allowed opacity-60'
+              : 'bg-red-500/20 border-red-200/30 hover:scale-105'
+          }`}
         >
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-              <ArrowDownCircle className="w-8 h-8 text-white" />
+            <div className={`w-16 h-16 rounded-xl flex items-center justify-center shadow-lg transition-transform ${
+              retiroPendiente 
+                ? 'bg-gray-400'
+                : 'bg-gradient-to-br from-red-400 to-red-600 group-hover:scale-110'
+            }`}>
+              {retiroPendiente ? (
+                <Clock className="w-8 h-8 text-white" />
+              ) : (
+                <ArrowDownCircle className="w-8 h-8 text-white" />
+              )}
             </div>
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">Solicitar Retiro</h3>
-          <p className="text-red-200 text-sm">Envía una solicitud de retiro de tu inversión</p>
+          <h3 className="text-xl font-bold text-white mb-2">
+            {retiroPendiente ? 'Retiro Pendiente' : 'Solicitar Retiro'}
+          </h3>
+          <p className={`text-sm ${retiroPendiente ? 'text-gray-300' : 'text-red-200'}`}>
+            {retiroPendiente 
+              ? `Tienes un retiro de ${formatCurrency(retiroPendiente.monto)} en proceso`
+              : 'Envía una solicitud de retiro de tu inversión'
+            }
+          </p>
         </button>
       </div>
 
