@@ -24,19 +24,46 @@ const SocioDonutChart: React.FC<SocioDonutChartProps> = ({ partnerId }) => {
 
   const fetchChartData = async () => {
     try {
-      const { data, error } = await supabase.rpc('obtener_datos_torta_partner', {
-        p_partner_id: partnerId
-      });
+      // Obtener todas las transacciones del partner
+      const { data: transactions, error } = await supabase
+        .from('partner_transacciones')
+        .select('monto, tipo')
+        .eq('partner_id', partnerId);
 
       if (error) throw error;
 
-      if (data && Array.isArray(data)) {
-        // Filtrar solo los elementos con valor mayor a 0
-        const filteredData = data.filter((item: DonutChartData) => item.value > 0);
-        setChartData(filteredData);
-      } else {
-        setChartData([]);
-      }
+      // Calcular totales por tipo (incluyendo retiros)
+      let depositos = 0;
+      let retiros = 0;
+      let reinversiones = 0;
+      let ganancias = 0;
+
+      transactions?.forEach(transaction => {
+        switch (transaction.tipo.toLowerCase()) {
+          case 'deposito':
+            depositos += Number(transaction.monto);
+            break;
+          case 'retiro':
+            retiros += Number(transaction.monto);
+            break;
+          case 'reinversion':
+            reinversiones += Number(transaction.monto);
+            break;
+          case 'ganancia':
+            ganancias += Number(transaction.monto);
+            break;
+        }
+      });
+
+      // Crear datos para el gráfico incluyendo todas las categorías con valores
+      const data = [
+        { name: 'Depósitos', value: depositos, color: '#10b981' },
+        { name: 'Retiros', value: retiros, color: '#ef4444' },
+        { name: 'Reinversiones', value: reinversiones, color: '#3b82f6' },
+        { name: 'Ganancias', value: ganancias, color: '#f59e0b' }
+      ].filter(item => item.value > 0); // Solo mostrar categorías con valor
+
+      setChartData(data);
     } catch (error) {
       console.error('Error fetching chart data:', error);
       setChartData([]);
@@ -131,6 +158,15 @@ const SocioDonutChart: React.FC<SocioDonutChartProps> = ({ partnerId }) => {
           </ResponsiveContainer>
         )}
       </div>
+      
+      {/* Información adicional */}
+      {chartData.length > 0 && (
+        <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/20">
+          <p className="text-white/80 text-sm text-center">
+            <strong>Flujo de Capital:</strong> Visualización completa de depósitos, retiros, reinversiones y ganancias
+          </p>
+        </div>
+      )}
     </div>
   );
 };

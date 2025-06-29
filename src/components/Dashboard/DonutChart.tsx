@@ -28,10 +28,11 @@ const DonutChart: React.FC<DonutChartProps> = () => {
 
       if (error) throw error;
 
-      // Calcular totales por tipo (solo usar palabras sin acentos)
+      // Calcular totales por tipo (incluyendo retiros)
       let depositos = 0;
       let retiros = 0;
       let reinversiones = 0;
+      let ganancias = 0;
 
       transactions?.forEach(transaction => {
         switch (transaction.tipo.toLowerCase()) {
@@ -44,13 +45,18 @@ const DonutChart: React.FC<DonutChartProps> = () => {
           case 'reinversion': // Solo esta forma
             reinversiones += Number(transaction.monto);
             break;
+          case 'ganancia':
+            ganancias += Number(transaction.monto);
+            break;
         }
       });
 
+      // Crear datos para el gráfico incluyendo todas las categorías con valores
       const data = [
         { name: 'Depósitos', value: depositos, color: '#10b981' },
         { name: 'Retiros', value: retiros, color: '#ef4444' },
-        { name: 'Reinversiones', value: reinversiones, color: '#3b82f6' }
+        { name: 'Reinversiones', value: reinversiones, color: '#3b82f6' },
+        { name: 'Ganancias', value: ganancias, color: '#f59e0b' }
       ].filter(item => item.value > 0); // Solo mostrar categorías con valor
 
       setChartData(data);
@@ -61,7 +67,7 @@ const DonutChart: React.FC<DonutChartProps> = () => {
     }
   };
 
-  const COLORS = ['#10b981', '#ef4444', '#3b82f6'];
+  const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('es-ES', {
@@ -149,6 +155,15 @@ const DonutChart: React.FC<DonutChartProps> = () => {
           </ResponsiveContainer>
         )}
       </div>
+      
+      {/* Información adicional */}
+      {chartData.length > 0 && (
+        <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/20">
+          <p className="text-white/80 text-sm text-center">
+            <strong>Flujo de Capital:</strong> Visualización completa de depósitos, retiros, reinversiones y ganancias
+          </p>
+        </div>
+      )}
     </div>
   );
 };
