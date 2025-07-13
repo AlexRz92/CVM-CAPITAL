@@ -43,7 +43,7 @@ export const Index: React.FC = () => {
           <div className="flex justify-center mb-6">
             <div className="relative animate-bounce-slow">
               <img 
-                src="src/public/Logo_index.gif" 
+                src="Logo_index.gif" 
                 alt="CVM Capital Logo" 
                 className="h-32 w-auto object-contain"
               />
