@@ -236,10 +236,7 @@ const Login: React.FC = () => {
                     placeholder="correo@ejemplo.com o usuario"
                   />
                 </div>
-                <p className="text-white/60 text-xs mt-1">
-                  Usa tu email para inversores o tu usuario para admin/operador/socio
-                </p>
-              </div>
+                </div>
 
               {/* Password */}
               <div>
