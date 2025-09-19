@@ -16,8 +16,8 @@ interface Usuario {
   apellido?: string;
   email?: string;
   username?: string;
+  total?: number;
   activo?: boolean;
-  saldo_modulo?: number;
 }
 
 const ModuloAsignaciones: React.FC<ModuloAsignacionesProps> = ({ moduloId, moduloNombre, showMessage }) => {
@@ -47,7 +47,7 @@ const ModuloAsignaciones: React.FC<ModuloAsignacionesProps> = ({ moduloId, modul
       // Obtener todos los inversores con su saldo principal
       const { data: allInversores, error: inversoresError } = await supabase
         .from('inversores')
-        .select('id, nombre, apellido, email')
+        .select('id, nombre, apellido, email, total')
         .order('nombre');
 
       if (inversoresError) throw inversoresError;
@@ -409,39 +409,11 @@ const ModuloAsignaciones: React.FC<ModuloAsignacionesProps> = ({ moduloId, modul
   const handleTransferirInversor = async (inversorId: string) => {
     const inversor = inversores.find(inv => inv.id === inversorId);
     if (inversor) {
-      // Calcular saldo principal del inversor
-      const { data: transacciones, error } = await supabase
-        .from('transacciones')
-        .select('monto, tipo')
-        .eq('inversor_id', inversorId)
-        .eq('usuario_tipo', 'inversor');
-
-      if (error) {
-        showMessage('Error', 'Error al obtener saldo del inversor', 'error');
-        return;
-      }
-
-      // Calcular saldo principal
-      let saldoPrincipal = 0;
-      transacciones?.forEach(transaction => {
-        switch (transaction.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoPrincipal += Number(transaction.monto);
-            break;
-          case 'retiro':
-            saldoPrincipal -= Number(transaction.monto);
-            break;
-          case 'ganancia':
-            saldoPrincipal += Number(transaction.monto);
-            break;
-        }
-      });
-
       setShowTransferModal({
         type: 'inversor',
         id: inversorId,
         name: `${inversor.nombre} ${inversor.apellido}`,
-        saldoPrincipal: saldoPrincipal
+        saldoPrincipal: inversor.total || 0
       });
     }
   };

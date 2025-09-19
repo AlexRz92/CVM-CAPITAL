@@ -3,96 +3,15 @@ import { DollarSign } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 
 interface Partner {
-  id: string;
+  saldo_actual: number;
 }
 
 interface SocioStatsCardsProps {
   partner: Partner;
+  ganancias: { ganancia_total: number };
 }
 
 const SocioStatsCards: React.FC<SocioStatsCardsProps> = ({ partner }) => {
-  const [saldoActual, setSaldoActual] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (partner?.id) {
-      calcularSaldoActual();
-    }
-  }, [partner?.id]);
-
-  const calcularSaldoActual = async () => {
-    try {
-      // Calcular saldo desde transacciones principales
-      const { data: transaccionesPrincipales, error: errorPrincipal } = await supabase
-        .from('transacciones')
-        .select('monto, tipo')
-        .eq('partner_id', partner.id)
-        .eq('usuario_tipo', 'partner');
-
-      if (errorPrincipal) throw errorPrincipal;
-
-      let saldoPrincipal = 0;
-      transaccionesPrincipales?.forEach(t => {
-        switch (t.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoPrincipal += Number(t.monto);
-            break;
-          case 'retiro':
-            saldoPrincipal -= Number(t.monto);
-            break;
-          case 'ganancia':
-            saldoPrincipal += Number(t.monto);
-            break;
-        }
-      });
-
-      // Calcular saldo desde módulos
-      const { data: transaccionesModulos, error: errorModulos } = await supabase
-        .from('modulo_transacciones')
-        .select('monto, tipo')
-        .eq('partner_id', partner.id)
-        .eq('usuario_tipo', 'partner');
-
-      if (errorModulos) throw errorModulos;
-
-      let saldoModulos = 0;
-      transaccionesModulos?.forEach(t => {
-        switch (t.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoModulos += Number(t.monto);
-            break;
-          case 'retiro':
-            saldoModulos -= Number(t.monto);
-            break;
-          case 'ganancia':
-            saldoModulos += Number(t.monto);
-            break;
-        }
-      });
-
-      setSaldoActual(saldoPrincipal + saldoModulos);
-    } catch (error) {
-      console.error('Error calculando saldo actual del partner:', error);
-      setSaldoActual(0);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center mb-8">
-        <div className="w-full max-w-md">
-          <div className="bg-purple-400/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-cyan-200/50">
-            <div className="flex items-center justify-center h-24">
-              <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex justify-center mb-8">
       <div className="w-full max-w-md">
@@ -107,7 +26,7 @@ const SocioStatsCards: React.FC<SocioStatsCardsProps> = ({ partner }) => {
           </div>
           
           <div className="space-y-2">
-            <p className="text-2xl font-bold text-white">{formatCurrency(saldoActual)}</p>
+            <p className="text-2xl font-bold text-white">{formatCurrency(partner.saldo_actual)}</p>
             <p className="text-xs text-white/70">Saldo disponible para retiro</p>
             <div className="w-full bg-white/20 rounded-full h-2">
               <div 

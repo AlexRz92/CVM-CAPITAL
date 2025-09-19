@@ -39,55 +39,33 @@ const SocioSolicitudButtons: React.FC = () => {
     if (!partner) return;
     
     try {
-      // Calcular saldo desde transacciones principales
-      const { data: transaccionesPrincipales, error: errorPrincipal } = await supabase
+      // Obtener todas las transacciones del partner
+      const { data: transactions, error } = await supabase
         .from('transacciones')
         .select('monto, tipo')
         .eq('partner_id', partner.id)
         .eq('usuario_tipo', 'partner');
 
-      if (errorPrincipal) throw errorPrincipal;
+      if (error) throw error;
 
-      let saldoPrincipal = 0;
-      transaccionesPrincipales?.forEach(t => {
-        switch (t.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoPrincipal += Number(t.monto);
-            break;
-          case 'retiro':
-            saldoPrincipal -= Number(t.monto);
-            break;
-          case 'ganancia':
-            saldoPrincipal += Number(t.monto);
-            break;
-        }
-      });
-
-      // Calcular saldo desde módulos
-      const { data: transaccionesModulos, error: errorModulos } = await supabase
-        .from('modulo_transacciones')
-        .select('monto, tipo')
-        .eq('partner_id', partner.id)
-        .eq('usuario_tipo', 'partner');
-
-      if (errorModulos) throw errorModulos;
-
-      let saldoModulos = 0;
-      transaccionesModulos?.forEach(t => {
-        switch (t.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoModulos += Number(t.monto);
-            break;
-          case 'retiro':
-            saldoModulos -= Number(t.monto);
-            break;
-          case 'ganancia':
-            saldoModulos += Number(t.monto);
-            break;
-        }
-      });
+      // Calcular saldo actual
+      let saldo = 0;
       
-      setSaldoActual(saldoPrincipal + saldoModulos);
+      transactions?.forEach(transaction => {
+        switch (transaction.tipo.toLowerCase()) {
+          case 'deposito':
+            saldo += Number(transaction.monto);
+            break;
+          case 'retiro':
+            saldo -= Number(transaction.monto);
+            break;
+          case 'ganancia':
+            saldo += Number(transaction.monto);
+            break;
+        }
+      });
+
+      setSaldoActual(saldo);
     } catch (error) {
       console.error('Error fetching saldo actual:', error);
       setSaldoActual(0);

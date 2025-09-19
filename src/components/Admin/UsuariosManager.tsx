@@ -28,6 +28,7 @@ interface Inversor {
   nombre: string;
   apellido: string;
   email: string;
+  total: number;
   created_at: string;
   last_login?: string;
   failed_attempts: number;
@@ -314,13 +315,13 @@ const UsuariosManager: React.FC<UsuariosManagerProps> = ({ onStatsUpdate }) => {
           nombre: formData.nombre,
           apellido: formData.apellido,
           email: formData.email.toLowerCase(),
-          pais: 'No especificado',
-          telegram_username: '',
           password_hash: hashedPassword,
           password_salt: salt,
           pregunta_secreta: formData.pregunta_secreta,
           respuesta_secreta: formData.respuesta_secreta.toLowerCase(),
-          // Eliminadas las columnas que no existen
+          capital_inicial2: 0,
+          ganancia_semanal2: 0,
+          total: 0
         });
 
       if (insertError) throw insertError;
@@ -377,116 +378,6 @@ const UsuariosManager: React.FC<UsuariosManagerProps> = ({ onStatsUpdate }) => {
     }
   };
 
-  const handleCreatePartner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!admin) return;
-
-    setSubmitting(true);
-    try {
-      // Verificar si el username ya existe
-      const { data: existingPartner, error: checkError } = await supabase
-        .from('partners')
-        .select('id')
-        .eq('username', partnerFormData.username)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-
-      if (existingPartner) {
-        alert('Este username ya está registrado');
-        setSubmitting(false);
-        return;
-      }
-
-      // Generar salt y hashear contraseña
-      const salt = generateSalt();
-      const hashedPassword = hashPassword(partnerFormData.password, salt);
-
-      // Crear nuevo partner
-      const { error: insertError } = await supabase
-        .from('partners')
-        .insert({
-          nombre: partnerFormData.nombre,
-          username: partnerFormData.username,
-          password_hash: hashedPassword,
-          password_salt: salt,
-          activo: true,
-          created_by: admin.id
-        });
-
-      if (insertError) throw insertError;
-
-      setShowCreatePartnerModal(false);
-      setPartnerFormData({
-        nombre: '',
-        username: '',
-        password: ''
-      });
-      fetchUsuarios();
-      onStatsUpdate();
-      setSuccessMessage('Partner creado exitosamente');
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error('Error creating partner:', error);
-      alert('Error al crear partner: ' + (error as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleEditPartner = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPartner) return;
-
-    setSubmitting(true);
-    try {
-      const { error } = await supabase
-        .from('partners')
-        .update({
-          nombre: editPartnerFormData.nombre,
-          username: editPartnerFormData.username,
-          activo: editPartnerFormData.activo
-        })
-        .eq('id', editingPartner.id);
-
-      if (error) throw error;
-
-      setEditingPartner(null);
-      setEditPartnerFormData({ nombre: '', username: '', activo: true });
-      fetchUsuarios();
-      onStatsUpdate();
-      setSuccessMessage('Partner actualizado exitosamente');
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error('Error updating partner:', error);
-      alert('Error al actualizar partner: ' + (error as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeletePartner = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este partner? Esta acción eliminará todas sus transacciones y no se puede deshacer.')) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('partners')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      fetchUsuarios();
-      onStatsUpdate();
-      setSuccessMessage('Partner eliminado exitosamente');
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error('Error deleting partner:', error);
-      alert('Error al eliminar partner: ' + (error as Error).message);
-    }
-  };
   const handleDeleteInversor = async (id: string) => {
     if (!confirm('¿Estás seguro de que deseas eliminar este inversor? Esta acción eliminará todas sus transacciones y no se puede deshacer.')) {
       return;
@@ -699,6 +590,7 @@ const UsuariosManager: React.FC<UsuariosManagerProps> = ({ onStatsUpdate }) => {
                           </h5>
                           <p className="text-white/70 text-sm">{inversor.email}</p>
                           <div className="flex items-center space-x-4 text-xs text-white/60 mt-1">
+                            <span>Saldo: {formatCurrency(inversor.total)}</span>
                             <span>Registro: {formatDate(inversor.created_at)}</span>
                             {inversor.last_login && (
                               <span>Último login: {formatDate(inversor.last_login)}</span>
@@ -785,122 +677,43 @@ const UsuariosManager: React.FC<UsuariosManagerProps> = ({ onStatsUpdate }) => {
             <div className="space-y-4">
               {filteredPartners.map((partner) => (
                 <div key={partner.id} className="bg-white/10 rounded-lg p-4 border border-white/20">
-                  {editingPartner?.id === partner.id ? (
-                    // Modo edición
-                    <form onSubmit={handleEditPartner} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-white/80 text-sm mb-1">Nombre</label>
-                          <input
-                            type="text"
-                            value={editPartnerFormData.nombre}
-                            onChange={(e) => setEditPartnerFormData({...editPartnerFormData, nombre: e.target.value})}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-                            required
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-white/80 text-sm mb-1">Username</label>
-                          <input
-                            type="text"
-                            value={editPartnerFormData.username}
-                            onChange={(e) => setEditPartnerFormData({...editPartnerFormData, username: e.target.value})}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-                            required
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-white/80 text-sm mb-1">Estado</label>
-                          <select
-                            value={editPartnerFormData.activo.toString()}
-                            onChange={(e) => setEditPartnerFormData({...editPartnerFormData, activo: e.target.value === 'true'})}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/30 rounded text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-                          >
-                            <option value="true" className="text-black">Activo</option>
-                            <option value="false" className="text-black">Inactivo</option>
-                          </select>
-                        </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center">
+                        <Users className="w-6 h-6 text-white" />
                       </div>
                       
-                      <div className="flex items-center space-x-3">
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          className="flex items-center space-x-2 bg-green-500/20 text-green-300 px-3 py-2 rounded hover:bg-green-500/30 transition-colors disabled:opacity-50"
-                        >
-                          <Save className="w-4 h-4" />
-                          <span>{submitting ? 'Guardando...' : 'Guardar'}</span>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingPartner(null);
-                            setEditPartnerFormData({ nombre: '', username: '', activo: true });
-                          }}
-                          disabled={submitting}
-                          className="flex items-center space-x-2 bg-gray-500/20 text-gray-300 px-3 py-2 rounded hover:bg-gray-500/30 transition-colors disabled:opacity-50"
-                        >
-                          <X className="w-4 h-4" />
-                          <span>Cancelar</span>
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    // Modo visualización
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center">
-                          <Users className="w-6 h-6 text-white" />
+                      <div>
+                        <h5 className="text-white font-semibold">{partner.nombre}</h5>
+                        <p className="text-white/70 text-sm">@{partner.username}</p>
+                        <div className="flex items-center space-x-4 text-xs text-white/60 mt-1">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                            partner.activo 
+                              ? 'bg-green-500/20 text-green-300'
+                              : 'bg-red-500/20 text-red-300'
+                          }`}>
+                            {partner.activo ? 'ACTIVO' : 'INACTIVO'}
+                          </span>
+                          <span>Registro: {formatDate(partner.created_at)}</span>
+                          {partner.last_login && (
+                            <span>Último login: {formatDate(partner.last_login)}</span>
+                          )}
                         </div>
-                        
-                        <div>
-                          <h5 className="text-white font-semibold">{partner.nombre}</h5>
-                          <p className="text-white/70 text-sm">@{partner.username}</p>
-                          <div className="flex items-center space-x-4 text-xs text-white/60 mt-1">
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                              partner.activo 
-                                ? 'bg-green-500/20 text-green-300'
-                                : 'bg-red-500/20 text-red-300'
-                            }`}>
-                              {partner.activo ? 'ACTIVO' : 'INACTIVO'}
-                            </span>
-                            <span>Registro: {formatDate(partner.created_at)}</span>
-                            {partner.last_login && (
-                              <span>Último login: {formatDate(partner.last_login)}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => {
-                            setEditingPartner(partner);
-                            setEditPartnerFormData({
-                              nombre: partner.nombre,
-                              username: partner.username,
-                              activo: partner.activo
-                            });
-                          }}
-                          className="p-2 text-blue-300 hover:bg-blue-500/20 rounded transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        
-                        <button
-                          onClick={() => handleDeletePartner(partner.id)}
-                          className="p-2 text-red-300 hover:bg-red-500/20 rounded transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
-                  )}
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          // Implementar edición de partner si es necesario
+                        }}
+                        className="p-2 text-blue-300 hover:bg-blue-500/20 rounded transition-colors"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1025,83 +838,6 @@ const UsuariosManager: React.FC<UsuariosManagerProps> = ({ onStatsUpdate }) => {
         </div>
       )}
 
-      {/* Modal de crear partner */}
-      {showCreatePartnerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Crear Nuevo Partner</h3>
-            
-            <form onSubmit={handleCreatePartner} className="space-y-4">
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">Nombre *</label>
-                <input
-                  type="text"
-                  value={partnerFormData.nombre}
-                  onChange={(e) => setPartnerFormData({...partnerFormData, nombre: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">Username *</label>
-                <input
-                  type="text"
-                  value={partnerFormData.username}
-                  onChange={(e) => setPartnerFormData({...partnerFormData, username: e.target.value})}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="username_partner"
-                  required
-                />
-              </div>
-              
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">Contraseña *</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={partnerFormData.password}
-                    onChange={(e) => setPartnerFormData({...partnerFormData, password: e.target.value})}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex space-x-4 pt-4">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submitting ? 'Creando...' : 'Crear Partner'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreatePartnerModal(false);
-                    setPartnerFormData({
-                      nombre: '',
-                      username: '',
-                      password: ''
-                    });
-                  }}
-                  className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
       {/* Modal de transacciones */}
       {showTransactionsModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

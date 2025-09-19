@@ -8,5 +8,3 @@ export { default as HelpChat } from './HelpChat';
 export { default as PDFExporter } from './PDFExporter';
 export { default as FloatingNotificationBell } from './FloatingNotificationBell';
 export { default as FloatingTransferButton } from './FloatingTransferButton';
-export { default as BeneficiarioManager } from './BeneficiarioManager';
-export { default as DatosPersonalesModal } from './DatosPersonalesModal';

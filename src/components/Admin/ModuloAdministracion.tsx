@@ -441,91 +441,73 @@ const ModuloAdministracion: React.FC<ModuloAdministracionProps> = ({ onUpdate })
       // Realizar rollback de períodos procesados
       if (periodosProcessados && periodosProcessados.length > 0) {
         for (const periodo of periodosProcessados) {
-          try {
-            // Intentar rollback usando la función general
-            const { data: result, error } = await supabase.rpc('rollback_periodo_modulo', {
-              p_modulo_id: showDeleteModal.id,
-              p_numero_mes: periodo.numero_mes,
-              p_admin_id: admin?.id
-            });
+          const { data: rollbackResult, error: rollbackError } = await supabase.rpc('rollback_periodo_modulo', {
+            p_modulo_id: showDeleteModal.id,
+            p_numero_mes: periodo.numero_mes,
+            p_admin_id: admin?.id
+          });
 
-            if (error) {
-              console.warn(`Error en rollback del período ${periodo.nombre_mes}, continuando con eliminación directa:`, error);
-              // Si el rollback falla, continuar con la eliminación directa
-            } else {
-              const rollbackResult = result?.[0];
-              if (!rollbackResult?.success) {
-                console.warn(`Rollback no exitoso para período ${periodo.nombre_mes}: ${rollbackResult?.message}`);
-              }
-            }
-          } catch (rollbackError) {
-            console.warn(`Error en rollback del período ${periodo.nombre_mes}, continuando:`, rollbackError);
-            // Continuar con la eliminación aunque el rollback falle
+          if (rollbackError) {
+            console.error(`Error en rollback del período ${periodo.nombre_mes}:`, rollbackError);
+            throw rollbackError;
+          }
+
+          const result = rollbackResult?.[0];
+          if (!result?.success) {
+            throw new Error(`Error en rollback del período ${periodo.nombre_mes}: ${result?.message}`);
           }
         }
       }
       
       // Eliminar en orden para evitar errores de foreign key
-      try {
-        // 1. Eliminar transacciones del módulo
-        const { error: transError } = await supabase
-          .from('modulo_transacciones')
-          .delete()
-          .eq('modulo_id', showDeleteModal.id);
+      
+      // 1. Eliminar transacciones del módulo
+      const { error: transError } = await supabase
+        .from('modulo_transacciones')
+        .delete()
+        .eq('modulo_id', showDeleteModal.id);
 
-        if (transError) console.warn('Error eliminando transacciones:', transError);
+      if (transError) throw transError;
 
-        // 2. Eliminar solicitudes del módulo (inversores)
-        const { error: solicitudesError } = await supabase
-          .from('modulo_solicitudes')
-          .delete()
-          .eq('modulo_id', showDeleteModal.id);
+      // 2. Eliminar solicitudes del módulo (inversores)
+      const { error: solicitudesError } = await supabase
+        .from('modulo_solicitudes')
+        .delete()
+        .eq('modulo_id', showDeleteModal.id);
 
-        if (solicitudesError) console.warn('Error eliminando solicitudes inversores:', solicitudesError);
+      if (solicitudesError) throw solicitudesError;
 
-        // 3. Eliminar solicitudes del módulo (partners)
-        const { error: solicitudesPartnersError } = await supabase
-          .from('modulo_partner_solicitudes')
-          .delete()
-          .eq('modulo_id', showDeleteModal.id);
+      // 3. Eliminar solicitudes del módulo (partners)
+      const { error: solicitudesPartnersError } = await supabase
+        .from('modulo_partner_solicitudes')
+        .delete()
+        .eq('modulo_id', showDeleteModal.id);
 
-        if (solicitudesPartnersError) console.warn('Error eliminando solicitudes partners:', solicitudesPartnersError);
+      if (solicitudesPartnersError) throw solicitudesPartnersError;
 
-        // 4. Eliminar propuestas de ganancias del operador
-        const { error: propuestasError } = await supabase
-          .from('operador_ganancias_propuestas')
-          .delete()
-          .eq('modulo_id', showDeleteModal.id);
+      // 4. Eliminar meses del módulo
+      const { error: mesesError } = await supabase
+        .from('modulo_meses')
+        .delete()
+        .eq('modulo_id', showDeleteModal.id);
 
-        if (propuestasError) console.warn('Error eliminando propuestas operador:', propuestasError);
+      if (mesesError) throw mesesError;
 
-        // 5. Eliminar meses del módulo
-        const { error: mesesError } = await supabase
-          .from('modulo_meses')
-          .delete()
-          .eq('modulo_id', showDeleteModal.id);
+      // 5. Eliminar asignaciones del módulo
+      const { error: asignacionesError } = await supabase
+        .from('modulo_asignaciones')
+        .delete()
+        .eq('modulo_id', showDeleteModal.id);
 
-        if (mesesError) console.warn('Error eliminando meses:', mesesError);
+      if (asignacionesError) throw asignacionesError;
 
-        // 6. Eliminar asignaciones del módulo
-        const { error: asignacionesError } = await supabase
-          .from('modulo_asignaciones')
-          .delete()
-          .eq('modulo_id', showDeleteModal.id);
+      // 6. Finalmente eliminar el módulo
+      const { error: moduloError } = await supabase
+        .from('modulos_independientes')
+        .delete()
+        .eq('id', showDeleteModal.id);
 
-        if (asignacionesError) console.warn('Error eliminando asignaciones:', asignacionesError);
-
-        // 7. Finalmente eliminar el módulo
-        const { error: moduloError } = await supabase
-          .from('modulos_independientes')
-          .delete()
-          .eq('id', showDeleteModal.id);
-
-        if (moduloError) throw moduloError;
-      } catch (deleteError) {
-        console.error('Error en proceso de eliminación:', deleteError);
-        throw deleteError;
-      }
+      if (moduloError) throw moduloError;
 
       setShowDeleteModal(null);
       await fetchModulos();

@@ -43,70 +43,11 @@ const SolicitudButtons: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      calcularSaldoActual();
+      setSaldoActual(user.total);
       fetchSolicitudesPendientes();
       loadSavedEmails();
     }
   }, [user]);
-
-  const calcularSaldoActual = async () => {
-    if (!user) return;
-    
-    try {
-      // Calcular saldo desde transacciones principales
-      const { data: transaccionesPrincipales, error: errorPrincipal } = await supabase
-        .from('transacciones')
-        .select('monto, tipo')
-        .eq('inversor_id', user.id)
-        .eq('usuario_tipo', 'inversor');
-
-      if (errorPrincipal) throw errorPrincipal;
-
-      let saldoPrincipal = 0;
-      transaccionesPrincipales?.forEach(t => {
-        switch (t.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoPrincipal += Number(t.monto);
-            break;
-          case 'retiro':
-            saldoPrincipal -= Number(t.monto);
-            break;
-          case 'ganancia':
-            saldoPrincipal += Number(t.monto);
-            break;
-        }
-      });
-
-      // Calcular saldo desde módulos
-      const { data: transaccionesModulos, error: errorModulos } = await supabase
-        .from('modulo_transacciones')
-        .select('monto, tipo')
-        .eq('inversor_id', user.id)
-        .eq('usuario_tipo', 'inversor');
-
-      if (errorModulos) throw errorModulos;
-
-      let saldoModulos = 0;
-      transaccionesModulos?.forEach(t => {
-        switch (t.tipo.toLowerCase()) {
-          case 'deposito':
-            saldoModulos += Number(t.monto);
-            break;
-          case 'retiro':
-            saldoModulos -= Number(t.monto);
-            break;
-          case 'ganancia':
-            saldoModulos += Number(t.monto);
-            break;
-        }
-      });
-
-      setSaldoActual(saldoPrincipal + saldoModulos);
-    } catch (error) {
-      console.error('Error calculando saldo actual:', error);
-      setSaldoActual(0);
-    }
-  };
 
   const loadSavedEmails = () => {
     if (!user) return;
