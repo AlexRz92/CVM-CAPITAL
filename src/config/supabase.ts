@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://omouzqcsylvmswyipcef.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3V6cWNzeWx2bXN3eWlwY2VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyNjIyMzcsImV4cCI6MjA2OTgzODIzN30.TF3A1iMJpsP0pNa7uCZThtJl_IKjyurdVd7rpNT_lZ0';
-
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://qcyoriwwzysgxjcwtyxa.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjeW9yaXd3enlzZ3hqY3d0eXhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI5NDMyOTEsImV4cCI6MjA2ODUxOTI5MX0.e6FNvKtPJUpkVFjDw4U0UhHtCG5Ko_ud0U7zzzTmk8A';
+ 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: false
@@ -116,6 +116,7 @@ export type Database = {
           modulo_id: string;
           numero_mes: number;
           nombre_mes: string;
+          semana: number | null;
           fecha_inicio: string;
           fecha_fin: string;
           total_inversion: number;
@@ -124,12 +125,14 @@ export type Database = {
           procesado: boolean;
           fecha_procesado: string | null;
           procesado_por: string | null;
+          tipo_periodo: 'mensual' | 'semanal';
         };
         Insert: {
           id?: string;
           modulo_id: string;
           numero_mes: number;
           nombre_mes: string;
+          semana?: number | null;
           fecha_inicio: string;
           fecha_fin: string;
           total_inversion?: number;
@@ -138,12 +141,14 @@ export type Database = {
           procesado?: boolean;
           fecha_procesado?: string | null;
           procesado_por?: string | null;
+          tipo_periodo?: 'mensual' | 'semanal';
         };
         Update: {
           id?: string;
           modulo_id?: string;
           numero_mes?: number;
           nombre_mes?: string;
+          semana?: number | null;
           fecha_inicio?: string;
           fecha_fin?: string;
           total_inversion?: number;
@@ -152,6 +157,7 @@ export type Database = {
           procesado?: boolean;
           fecha_procesado?: string | null;
           procesado_por?: string | null;
+          tipo_periodo?: 'mensual' | 'semanal';
         };
       };
       modulo_solicitudes: {
@@ -242,45 +248,60 @@ export type Database = {
           nombre: string;
           apellido: string;
           email: string;
+          pais: string | null;
+          telegram_username: string | null;
           pregunta_secreta: string;
           respuesta_secreta: string;
           password_hash: string;
           password_salt: string;
-          total: number;
           last_login: string | null;
           failed_attempts: number;
           locked_until: string | null;
           created_at: string;
+          beneficiario_nombre: string | null;
+          beneficiario_apellido: string | null;
+          beneficiario_telefono: string | null;
+          beneficiario_email: string | null;
         };
         Insert: {
           id?: string;
           nombre: string;
           apellido: string;
           email: string;
+          pais?: string | null;
+          telegram_username?: string | null;
           pregunta_secreta: string;
           respuesta_secreta: string;
           password_hash: string;
           password_salt: string;
-          total?: number;
           last_login?: string | null;
           failed_attempts?: number;
           locked_until?: string | null;
           created_at?: string;
+          beneficiario_nombre?: string | null;
+          beneficiario_apellido?: string | null;
+          beneficiario_telefono?: string | null;
+          beneficiario_email?: string | null;
         };
         Update: {
           id?: string;
           nombre?: string;
           apellido?: string;
           email?: string;
+          pais?: string | null;
+          telegram_username?: string | null;
           pregunta_secreta?: string;
           respuesta_secreta?: string;
           password_hash?: string;
           password_salt?: string;
-          total?: number;
           last_login?: string | null;
           failed_attempts?: number;
           locked_until?: string | null;
           created_at?: string;
+          beneficiario_nombre?: string | null;
+          beneficiario_apellido?: string | null;
+          beneficiario_telefono?: string | null;
+          beneficiario_email?: string | null;
         };
       };
       partners: {
@@ -464,6 +485,62 @@ export type Database = {
           fecha_procesado?: string | null;
           procesado_por?: string | null;
           notas?: string | null;
+        };
+      };
+      beneficiario_cambios: {
+        Row: {
+          id: string;
+          inversor_id: string;
+          beneficiario_actual_nombre: string;
+          beneficiario_actual_apellido: string;
+          beneficiario_actual_telefono: string;
+          beneficiario_actual_email: string;
+          nuevo_beneficiario_nombre: string;
+          nuevo_beneficiario_apellido: string;
+          nuevo_beneficiario_telefono: string;
+          nuevo_beneficiario_email: string;
+          estado: 'pendiente' | 'aprobado' | 'rechazado';
+          motivo_rechazo: string | null;
+          fecha_solicitud: string;
+          fecha_procesado: string | null;
+          procesado_por: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          inversor_id: string;
+          beneficiario_actual_nombre?: string;
+          beneficiario_actual_apellido?: string;
+          beneficiario_actual_telefono?: string;
+          beneficiario_actual_email?: string;
+          nuevo_beneficiario_nombre: string;
+          nuevo_beneficiario_apellido: string;
+          nuevo_beneficiario_telefono: string;
+          nuevo_beneficiario_email: string;
+          estado?: 'pendiente' | 'aprobado' | 'rechazado';
+          motivo_rechazo?: string | null;
+          fecha_solicitud?: string;
+          fecha_procesado?: string | null;
+          procesado_por?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          inversor_id?: string;
+          beneficiario_actual_nombre?: string;
+          beneficiario_actual_apellido?: string;
+          beneficiario_actual_telefono?: string;
+          beneficiario_actual_email?: string;
+          nuevo_beneficiario_nombre?: string;
+          nuevo_beneficiario_apellido?: string;
+          nuevo_beneficiario_telefono?: string;
+          nuevo_beneficiario_email?: string;
+          estado?: 'pendiente' | 'aprobado' | 'rechazado';
+          motivo_rechazo?: string | null;
+          fecha_solicitud?: string;
+          fecha_procesado?: string | null;
+          procesado_por?: string | null;
+          created_at?: string;
         };
       };
       notificaciones: {
@@ -705,6 +782,29 @@ export type Database = {
           clave?: string;
           valor?: string;
           descripcion?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+      };
+      mantenimiento: {
+        Row: {
+          id: string;
+          activo: boolean;
+          mensaje: string;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          activo?: boolean;
+          mensaje?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          activo?: boolean;
+          mensaje?: string;
           updated_at?: string;
           updated_by?: string | null;
         };
