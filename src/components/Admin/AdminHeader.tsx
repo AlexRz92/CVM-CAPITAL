@@ -1,10 +1,12 @@
 import React from 'react';
-import { LogOut, Shield, User } from 'lucide-react';
+import { LogOut, Shield, User, Settings, Power, PowerOff } from 'lucide-react';
 import { useAdmin } from '../../contexts/AdminContext';
+import { useMaintenance } from '../../hooks/useMaintenance';
 import { useNavigate } from 'react-router-dom';
 
 const AdminHeader: React.FC = () => {
   const { admin, logout } = useAdmin();
+  const { activo: maintenanceActive, updateMaintenanceStatus, loading: maintenanceLoading } = useMaintenance();
   const navigate = useNavigate();
   
   const currentDate = new Date().toLocaleDateString('es-ES', { 
@@ -15,9 +17,20 @@ const AdminHeader: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/admin-login');
   };
 
+  const handleToggleMaintenance = async () => {
+    if (maintenanceLoading) return;
+    
+    const newStatus = !maintenanceActive;
+    const defaultMessage = 'El sistema está en mantenimiento. Estaremos de vuelta pronto.';
+    
+    try {
+      await updateMaintenanceStatus(newStatus, defaultMessage, admin?.id);
+    } catch (error) {
+      console.error('Error toggling maintenance:', error);
+    }
+  };
   return (
     <header className="bg-gradient-to-br from-cyan-700 via-blue-400 to-blue-800 text-white shadow-lg">
       <div className="container mx-auto px-6 py-4">
@@ -49,6 +62,31 @@ const AdminHeader: React.FC = () => {
                 </div>
               )}
             </div>
+            
+            {/* Botón de Mantenimiento */}
+            {admin?.role === 'admin' && (
+              <button
+                onClick={handleToggleMaintenance}
+                disabled={maintenanceLoading}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 font-semibold border-2 ${
+                  maintenanceActive
+                    ? 'bg-red-500/20 text-red-200 border-red-400/50 hover:bg-red-500/30'
+                    : 'bg-green-500/20 text-green-200 border-green-400/50 hover:bg-green-500/30'
+                } ${maintenanceLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={maintenanceActive ? 'Desactivar mantenimiento' : 'Activar mantenimiento'}
+              >
+                {maintenanceLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : maintenanceActive ? (
+                  <PowerOff className="w-4 h-4" />
+                ) : (
+                  <Power className="w-4 h-4" />
+                )}
+                <span className="text-sm hidden sm:inline">
+                  {maintenanceActive ? 'Desactivar' : 'Activar'}
+                </span>
+              </button>
+            )}
             
             <button
               onClick={handleLogout}

@@ -64,10 +64,5 @@ npm run build
 - Gradientes modernos
 - Animaciones suaves
 - Responsive design
-
-## 📞 Soporte
-- Email: pnf.alexisruiz@gmail.com
-- Telegram: @thealex
-
 ---
 **C.V.M Capital** - *Inversión Inteligente, siempre con ustedes*

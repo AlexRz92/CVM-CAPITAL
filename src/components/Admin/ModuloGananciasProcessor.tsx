@@ -246,8 +246,7 @@ const ModuloGananciasProcessor: React.FC<ModuloGananciasProcessorProps> = ({
             id,
             nombre,
             apellido,
-            email,
-            ganancias_pausadas
+            email
           )
         `)
         .eq('modulo_id', moduloId)
@@ -309,8 +308,7 @@ const ModuloGananciasProcessor: React.FC<ModuloGananciasProcessorProps> = ({
             nombre: `${asignacion.inversores.nombre} ${asignacion.inversores.apellido}`,
             email: asignacion.inversores.email,
             tipo: 'inversor',
-            saldo_modulo: saldo,
-            ganancias_pausadas: asignacion.inversores.ganancias_pausadas || false
+            saldo_modulo: saldo
           });
         }
       }
@@ -411,44 +409,93 @@ const ModuloGananciasProcessor: React.FC<ModuloGananciasProcessorProps> = ({
   };
 
   const handleProcess = async () => {
-    if (!previewData || !mesActual || !admin) return;
+    if (!previewData || !mesActual) return;
 
     setProcessing(true);
     try {
-      console.log('Procesando ganancias del módulo con sistema de pausas:', moduloId);
+      console.log('Procesando ganancias del módulo:', moduloId);
 
-      // Usar la nueva función que maneja pausas automáticamente
-      const { data: result, error } = await supabase.rpc('procesar_ganancias_con_pausas_modulo', {
-        p_modulo_id: moduloId,
-        p_numero_mes: mesActual.numero_mes,
-        p_porcentaje_ganancia: parseFloat(porcentaje),
-        p_porcentaje_partners: usarConfiguracionPersonalizada 
-          ? parseFloat(porcentajePartnersCustom) 
-          : configuracionActual?.porcentaje_partners || 30,
-        p_porcentaje_inversores: usarConfiguracionPersonalizada 
-          ? parseFloat(porcentajeInversoresCustom) 
-          : configuracionActual?.porcentaje_inversores || 70,
-        p_admin_id: admin.id
-      });
+      // 1. Marcar el mes como procesado
+      const { error: updateMesError } = await supabase
+        .from('modulo_meses')
+        .update({
+          procesado: true,
+          fecha_procesado: new Date().toISOString(),
+          total_inversion: previewData.total_inversion,
+          porcentaje_ganancia: parseFloat(porcentaje),
+          ganancia_bruta: previewData.ganancia_bruta,
+          procesado_por: admin?.id
+        })
+        .eq('id', mesActual.id);
 
-      if (error) throw error;
+      if (updateMesError) throw updateMesError;
 
-      const processingResult = result?.[0];
-      if (!processingResult?.success) {
-        throw new Error(processingResult?.message || 'Error en el procesamiento');
+      // 2. Procesar ganancias para cada usuario
+      const transaccionesGanancias = [];
+      const notificaciones = [];
+
+      // Calcular ganancia proporcional para cada usuario
+      for (const usuario of previewData.usuarios_asignados) {
+        if (usuario.saldo_modulo <= 0) continue;
+
+        // Ganancia proporcional basada en su inversión
+        const proporcion = usuario.saldo_modulo / previewData.total_inversion;
+        const gananciaProporcional = previewData.ganancia_inversores * proporcion;
+
+        let gananciaTotal = gananciaProporcional;
+        let descripcionGanancia = `Ganancia proporcional ${mesActual.nombre_mes} - Módulo ${moduloNombre}`;
+
+        // Si es partner, agregar ganancia adicional
+        if (usuario.tipo === 'partner' && previewData.total_partners_activos > 0) {
+          gananciaTotal += previewData.ganancia_por_partner;
+          descripcionGanancia = `Ganancia ${mesActual.nombre_mes} - Módulo ${moduloNombre} (Proporcional: ${formatCurrency(gananciaProporcional)} + Adicional: ${formatCurrency(previewData.ganancia_por_partner)})`;
+        }
+
+        // Crear transacción de ganancia
+        transaccionesGanancias.push({
+          modulo_id: moduloId,
+          [usuario.tipo === 'inversor' ? 'inversor_id' : 'partner_id']: usuario.id,
+          usuario_tipo: usuario.tipo,
+          monto: gananciaTotal,
+          tipo: 'ganancia',
+          descripcion: descripcionGanancia,
+          fecha: new Date().toISOString()
+        });
+
+        // Crear notificación
+        notificaciones.push({
+          usuario_id: usuario.id,
+          tipo_usuario: usuario.tipo,
+          titulo: `Ganancias ${mesActual.nombre_mes} - ${moduloNombre}`,
+          mensaje: `Has recibido ${formatCurrency(gananciaTotal)} en ganancias del módulo ${moduloNombre} correspondientes a ${mesActual.nombre_mes}.`,
+          tipo_notificacion: 'success',
+          leida: false,
+          fecha_creacion: new Date().toISOString()
+        });
+      }
+
+      // 3. Insertar todas las transacciones de ganancias
+      if (transaccionesGanancias.length > 0) {
+        const { error: transaccionesError } = await supabase
+          .from('modulo_transacciones')
+          .insert(transaccionesGanancias);
+
+        if (transaccionesError) throw transaccionesError;
+      }
+
+      // 4. Insertar todas las notificaciones
+      if (notificaciones.length > 0) {
+        const { error: notificacionesError } = await supabase
+          .from('notificaciones')
+          .insert(notificaciones);
+
+        if (notificacionesError) throw notificacionesError;
       }
 
       setShowPreview(false);
       setPorcentaje('');
       setPreviewData(null);
-      
-      let mensaje = `Ganancias del módulo ${moduloNombre} procesadas exitosamente. Total distribuido: ${formatCurrency(processingResult.total_ganancias_distribuidas)}.`;
-      
-      if (processingResult.inversores_pausados > 0) {
-        mensaje += ` Se redistribuyeron ${formatCurrency(processingResult.ganancias_redistribuidas)} de ${processingResult.inversores_pausados} inversor(es) pausado(s) entre los partners.`;
-      }
-      
-      setSuccessMessage(mensaje);
+      setSuccessMessage(`Ganancias del módulo ${moduloNombre} procesadas exitosamente. Se procesaron ${transaccionesGanancias.length} ganancias y se enviaron ${notificaciones.length} notificaciones. Total distribuido: ${formatCurrency(previewData.ganancia_bruta)}.`);
       setShowSuccessModal(true);
       fetchMesActual();
       calcularTotalInversion();
@@ -760,52 +807,14 @@ const ModuloGananciasProcessor: React.FC<ModuloGananciasProcessorProps> = ({
           {/* Lista de usuarios y sus ganancias calculadas */}
           <div className="bg-white/5 rounded-lg p-4 mb-6">
             <h5 className="text-white font-semibold mb-3">Distribución Detallada por Usuario</h5>
-            
-            {/* Mostrar inversores pausados si los hay */}
-            {previewData.usuarios_asignados.some(u => u.ganancias_pausadas) && (
-              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-300" />
-                  <h6 className="text-yellow-200 font-semibold">Inversores con Ganancias Pausadas</h6>
-                </div>
-                <div className="space-y-1">
-                  {previewData.usuarios_asignados
-                    .filter(u => u.ganancias_pausadas)
-                    .map((usuario, index) => {
-                      const proporcion = usuario.saldo_modulo / previewData.total_inversion;
-                      const gananciaPausada = previewData.ganancia_inversores * proporcion;
-                      return (
-                        <p key={index} className="text-yellow-100 text-sm">
-                          • <strong>{usuario.nombre}</strong>: {formatCurrency(gananciaPausada)} (será redistribuido)
-                        </p>
-                      );
-                    })
-                  }
-                </div>
-              </div>
-            )}
-            
             <div className="max-h-60 overflow-y-auto space-y-2">
               {previewData.usuarios_asignados.map((usuario, index) => {
-                if (usuario.saldo_modulo <= 0 || usuario.ganancias_pausadas) return null;
+                if (usuario.saldo_modulo <= 0) return null;
                 
                 const proporcion = usuario.saldo_modulo / previewData.total_inversion;
                 const gananciaProporcional = previewData.ganancia_inversores * proporcion;
                 const gananciaAdicional = usuario.tipo === 'partner' ? previewData.ganancia_por_partner : 0;
-                
-                // Calcular redistribución adicional para partners
-                const inversoresPausados = previewData.usuarios_asignados.filter(u => u.ganancias_pausadas);
-                let redistribucionAdicional = 0;
-                
-                if (usuario.tipo === 'partner' && inversoresPausados.length > 0) {
-                  const totalGananciasPausadas = inversoresPausados.reduce((sum, inv) => {
-                    const propInv = inv.saldo_modulo / previewData.total_inversion;
-                    return sum + (previewData.ganancia_inversores * propInv);
-                  }, 0);
-                  redistribucionAdicional = totalGananciasPausadas / previewData.total_partners_activos;
-                }
-                
-                const gananciaTotal = gananciaProporcional + gananciaAdicional + redistribucionAdicional;
+                const gananciaTotal = gananciaProporcional + gananciaAdicional;
 
                 return (
                   <div key={index} className="bg-white/10 rounded p-3 flex items-center justify-between">
@@ -817,29 +826,15 @@ const ModuloGananciasProcessor: React.FC<ModuloGananciasProcessorProps> = ({
                     </div>
                     <div className="text-right">
                       <p className="text-green-300 font-bold">{formatCurrency(gananciaTotal)}</p>
-                      {usuario.tipo === 'partner' && (gananciaAdicional > 0 || redistribucionAdicional > 0) && (
+                      {usuario.tipo === 'partner' && gananciaAdicional > 0 && (
                         <p className="text-yellow-200 text-xs">
-                          Prop: {formatCurrency(gananciaProporcional)}
-                          {gananciaAdicional > 0 && ` + Adic: ${formatCurrency(gananciaAdicional)}`}
-                          {redistribucionAdicional > 0 && ` + Redist: ${formatCurrency(redistribucionAdicional)}`}
+                          Prop: {formatCurrency(gananciaProporcional)} + Adic: {formatCurrency(gananciaAdicional)}
                         </p>
                       )}
                     </div>
                   </div>
                 );
               })}
-              
-              {/* Mostrar mensaje si todos los usuarios están pausados o sin saldo */}
-              {previewData.usuarios_asignados.filter(u => u.saldo_modulo > 0 && !u.ganancias_pausadas).length === 0 && (
-                <div className="text-center py-4">
-                  <p className="text-white/70 text-sm">
-                    {previewData.usuarios_asignados.some(u => u.ganancias_pausadas) 
-                      ? 'Todos los inversores con saldo tienen ganancias pausadas'
-                      : 'No hay usuarios con saldo para recibir ganancias'
-                    }
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 

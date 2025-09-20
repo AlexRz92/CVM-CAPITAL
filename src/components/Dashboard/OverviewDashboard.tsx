@@ -5,6 +5,8 @@ import { supabase } from '../../config/supabase';
 import { Header } from '../Layout';
 import { HelpChat, FloatingNotificationBell, FloatingTransferButton } from './';
 import { PDFExporter } from './';
+import { BeneficiarioManager } from './';
+import { DatosPersonalesModal } from './';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -18,6 +20,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   AlertCircle,
+  Users,
+  Settings
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatters';
 import { useNavigate } from 'react-router-dom';
@@ -70,12 +74,56 @@ const OverviewDashboard: React.FC = () => {
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [showTransferPanel, setShowTransferPanel] = useState(false);
   const [showHelpChat, setShowHelpChat] = useState(false);
+  const [showBeneficiarioPanel, setShowBeneficiarioPanel] = useState(false);
+  const [showDatosPersonalesModal, setShowDatosPersonalesModal] = useState(false);
+  const [datosFaltantes, setDatosFaltantes] = useState<string[]>([]);
 
   useEffect(() => {
     if (user && modulos.length > 0) {
       verificarAccesoYCargarDatos();
     }
+    
+    // Verificar datos faltantes del usuario
+    if (user) {
+      verificarDatosFaltantes();
+    }
   }, [user, modulos]);
+
+  const verificarDatosFaltantes = async () => {
+    if (!user) return;
+    
+    // Verificar si el usuario ya cerró el modal en esta sesión
+    const dismissed = sessionStorage.getItem(`datos_personales_dismissed_${user.id}`);
+    if (dismissed === 'true') {
+      return;
+    }
+    
+    try {
+      const { data: userData, error } = await supabase
+        .from('inversores')
+        .select('pais, telegram_username, beneficiario_nombre, beneficiario_apellido, beneficiario_telefono, beneficiario_email')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      const faltantes: string[] = [];
+      
+      if (!userData.pais) faltantes.push('País');
+      if (!userData.telegram_username) faltantes.push('Usuario de Telegram');
+      if (!userData.beneficiario_nombre) faltantes.push('Nombre del Beneficiario');
+      if (!userData.beneficiario_apellido) faltantes.push('Apellido del Beneficiario');
+      if (!userData.beneficiario_telefono) faltantes.push('Teléfono del Beneficiario');
+      if (!userData.beneficiario_email) faltantes.push('Email del Beneficiario');
+
+      if (faltantes.length > 0) {
+        setDatosFaltantes(faltantes);
+        setShowDatosPersonalesModal(true);
+      }
+    } catch (error) {
+      console.error('Error verificando datos faltantes:', error);
+    }
+  };
 
   const verificarAccesoYCargarDatos = async () => {
     if (!user) return;
@@ -503,11 +551,27 @@ const OverviewDashboard: React.FC = () => {
 
         {/* Botón de Exportar PDF */}
         <div className="flex justify-center mb-8">
-          <PDFExporter 
-            userId={user.id} 
-            userName={`${user.nombre} ${user.apellido}`}
-            userType="inversor"
-          />
+          <div className="flex items-center space-x-4">
+            <PDFExporter 
+              userId={user.id} 
+              userName={`${user.nombre} ${user.apellido}`}
+              userType="inversor"
+            />
+            
+            <button
+              onClick={() => {
+                setShowBeneficiarioPanel(!showBeneficiarioPanel);
+                setShowNotificationsPanel(false);
+                setShowTransferPanel(false);
+                setShowHelpChat(false);
+              }}
+              className="bg-white/20 text-white px-6 py-3 rounded-lg hover:bg-white/30 transition-colors flex items-center space-x-3 border border-white/30 backdrop-blur-sm font-semibold"
+            >
+              <Users className="w-5 h-5" />
+              <span>Gestionar Beneficiario</span>
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
          
         {/* Métricas Principales */}
@@ -810,6 +874,7 @@ const OverviewDashboard: React.FC = () => {
         setShowOtherPanels={() => {
           setShowNotificationsPanel(false);
           setShowHelpChat(false);
+          setShowBeneficiarioPanel(false);
         }}
       />
       <FloatingNotificationBell 
@@ -820,6 +885,7 @@ const OverviewDashboard: React.FC = () => {
         setShowOtherPanels={() => {
           setShowTransferPanel(false);
           setShowHelpChat(false);
+          setShowBeneficiarioPanel(false);
         }}
       />
       <HelpChat 
@@ -830,6 +896,27 @@ const OverviewDashboard: React.FC = () => {
         setShowOtherPanels={() => {
           setShowTransferPanel(false);
           setShowNotificationsPanel(false);
+          setShowBeneficiarioPanel(false);
+        }}
+      />
+      <BeneficiarioManager 
+        userId={user?.id} 
+        showPanel={showBeneficiarioPanel}
+        setShowPanel={setShowBeneficiarioPanel}
+        setShowOtherPanels={() => {
+          setShowTransferPanel(false);
+          setShowNotificationsPanel(false);
+          setShowHelpChat(false);
+        }}
+      />
+      <DatosPersonalesModal 
+        show={showDatosPersonalesModal}
+        onClose={() => setShowDatosPersonalesModal(false)}
+        userId={user.id}
+        datosFaltantes={datosFaltantes}
+        onUpdate={() => {
+          setShowDatosPersonalesModal(false);
+          setDatosFaltantes([]);
         }}
       />
     </div>

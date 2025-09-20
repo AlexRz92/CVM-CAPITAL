@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, ArrowRight, Copy, MessageCircle, Eye, EyeOff, Lock, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { PasswordStrengthIndicator } from '../UI';
 import { useModal } from '../../hooks/useModal';
+import { useMaintenance } from '../../hooks/useMaintenance';
 import { UnifiedModal } from '../UI';
+import { MaintenanceModal } from '../UI';
 import { hashPassword, generateSalt } from '../../utils/crypto';
 import { sanitizeInput, isValidEmail, isValidPassword } from '../../utils/validation';
 
@@ -25,9 +27,30 @@ const Recovery: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showPasswordStrength, setShowPasswordStrength] = useState(false);
   const { modalState, hideModal, showSuccess, showError } = useModal();
+  const { activo: maintenanceActive, mensaje: maintenanceMessage, loading: maintenanceLoading } = useMaintenance();
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+
+  const handleCloseMaintenanceModal = () => {
+    setShowMaintenanceModal(false);
+  };
+
+  useEffect(() => {
+    // Mostrar modal de mantenimiento inmediatamente cuando esté activo
+    setShowMaintenanceModal(maintenanceActive && !maintenanceLoading);
+  }, [maintenanceActive, maintenanceLoading]);
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Verificar mantenimiento antes de proceder
+    if (maintenanceActive) {
+      showError(
+        'Sistema en Mantenimiento',
+        'La recuperación de contraseña no está disponible durante el mantenimiento. Por favor, inténtalo más tarde.'
+      );
+      return;
+    }
+
     setError('');
     setLoading(true);
 
@@ -464,6 +487,15 @@ const Recovery: React.FC = () => {
         </div>
       )}
       
+      {/* Modal de Mantenimiento */}
+      <MaintenanceModal
+        show={showMaintenanceModal}
+        message={maintenanceMessage}
+        onClose={handleCloseMaintenanceModal}
+        canClose={false} // No mostrar botón de cerrar
+        persistent={true} // Hacer el modal persistente
+      />
+
       <UnifiedModal
         show={modalState.show}
         type={modalState.type}

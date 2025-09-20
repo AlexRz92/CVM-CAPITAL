@@ -25,10 +25,16 @@ interface AuthContextType {
 interface RegisterData {
   nombre: string;
   apellido: string;
+  pais: string;
+  telegram_username: string;
   email: string;
   password: string;
   pregunta_secreta: string;
   respuesta_secreta: string;
+  beneficiario_nombre: string;
+  beneficiario_apellido: string;
+  beneficiario_telefono: string;
+  beneficiario_email: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -142,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: userData.email,
         capital_inicial: 0, // Ya no se usa esta columna
         ganancia_semanal: 0, // Ya no se usa esta columna
-        total: userData.total || 0
+        total: 0 // Calculado dinámicamente desde transacciones
       }));
 
       setUser({
@@ -152,7 +158,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: userData.email,
         capital_inicial: 0, // Ya no se usa esta columna
         ganancia_semanal: 0, // Ya no se usa esta columna
-        total: userData.total || 0
+        total: 0 // Calculado dinámicamente desde transacciones
       });
       
       setSessionToken(sessionToken);
@@ -237,13 +243,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           nombre: sanitizedNombre,
           apellido: sanitizedApellido,
           email: sanitizedEmail,
+          pais: formData.pais,
+          telegram_username: sanitizeInput(formData.telegram_username),
           password_hash: hashedPassword,
           password_salt: salt,
           pregunta_secreta: userData.pregunta_secreta,
           respuesta_secreta: sanitizedRespuesta,
-          capital_inicial2: 0,
-          ganancia_semanal2: 0,
-          total: 0
+          beneficiario_nombre: sanitizeInput(formData.beneficiario_nombre),
+          beneficiario_apellido: sanitizeInput(formData.beneficiario_apellido),
+          beneficiario_telefono: sanitizeInput(formData.beneficiario_telefono),
+          beneficiario_email: formData.beneficiario_email.toLowerCase(),
+          // Eliminadas las columnas que no existen
         })
         .select()
         .single();

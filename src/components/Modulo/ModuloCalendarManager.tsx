@@ -8,6 +8,7 @@ interface ModuloMes {
   modulo_id: string;
   numero_mes: number;
   nombre_mes: string;
+  semana: number | null;
   fecha_inicio: string;
   fecha_fin: string;
   total_inversion: number;
@@ -213,19 +214,16 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
 
   const fetchSiguienteNumero = async () => {
     try {
-      // Obtener el siguiente número de período disponible para el mes/tipo actual
-      let whereClause = { modulo_id: moduloId };
-      
       // Si es semanal, solo verificar períodos del mes seleccionado
       if (tipoPeriodo === 'semanal') {
-        // Para modo semanal, verificar solo períodos del mes actual seleccionado
+        // Para modo semanal, verificar períodos del mes seleccionado
         const { data: periodosDelMes, error: errorMes } = await supabase
           .from('modulo_meses')
-          .select('numero_mes, procesado, nombre_mes')
+          .select('numero_mes, semana, procesado, nombre_mes')
           .eq('modulo_id', moduloId)
+          .eq('numero_mes', selectedMonth)
           .eq('tipo_periodo', 'semanal')
-          .ilike('nombre_mes', `%${monthNames[selectedMonth - 1]}%`)
-          .order('numero_mes', { ascending: false });
+          .order('semana', { ascending: false });
         
         if (errorMes) throw errorMes;
         
@@ -234,18 +232,18 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
           const periodoNoProcesado = periodosDelMes.find(p => !p.procesado);
           
           if (periodoNoProcesado) {
-            // Hay un período sin procesar en este mes, no permitir crear nuevos
+            // Hay una semana sin procesar en este mes, no permitir crear nuevas
             setSiguienteNumero(-1);
           } else {
-            // Todos los períodos del mes están procesados, permitir crear el siguiente
-            const ultimoNumero = periodosDelMes[0].numero_mes;
+            // Todas las semanas del mes están procesadas, permitir crear la siguiente
+            const ultimaSemana = periodosDelMes[0].semana || 0;
             const maxSemanas = getWeekNamesForMonth(selectedMonth, currentYear).length;
             
-            if (ultimoNumero >= maxSemanas) {
+            if (ultimaSemana >= maxSemanas) {
               // Ya se crearon todas las semanas posibles para este mes
               setSiguienteNumero(-1);
             } else {
-              setSiguienteNumero(ultimoNumero + 1);
+              setSiguienteNumero(ultimaSemana + 1);
             }
           }
         } else {
@@ -258,9 +256,10 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
       // Para modo mensual, comportamiento original
       const { data: ultimoPeriodo, error } = await supabase
         .from('modulo_meses')
-        .select('numero_mes')
+        .select('numero_mes, semana')
         .eq('modulo_id', moduloId)
         .eq('tipo_periodo', 'mensual')
+        .whereNull('semana')
         .order('numero_mes', { ascending: false })
         .limit(1);
       
@@ -273,6 +272,7 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
           .select('id')
           .eq('modulo_id', moduloId)
           .eq('tipo_periodo', 'mensual')
+          .whereNull('semana')
           .eq('procesado', false)
           .limit(1);
         
@@ -315,7 +315,8 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
     return {
       fecha_inicio: fechaInicio.toISOString().split('T')[0],
       fecha_fin: fechaFin.toISOString().split('T')[0],
-      nombre_mes: `${monthNames[numeroMes - 1]} ${año}`
+      nombre_mes: `${monthNames[numeroMes - 1]} ${año}`,
+      semana: null
     };
   };
 
@@ -327,7 +328,8 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
       return {
         fecha_inicio: week.start.toISOString().split('T')[0],
         fecha_fin: week.end.toISOString().split('T')[0],
-        nombre_mes: `${week.fullName} ${año}`
+        nombre_mes: `${week.fullName} ${año}`,
+        semana: numeroSemana
       };
     }
     
@@ -338,19 +340,27 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
     return {
       fecha_inicio: fechaInicio.toISOString().split('T')[0],
       fecha_fin: fechaFin.toISOString().split('T')[0],
-      nombre_mes: `Semana ${numeroSemana} de ${monthNames[mesSeleccionado - 1]} ${año}`
+      nombre_mes: `Semana ${numeroSemana} de ${monthNames[mesSeleccionado - 1]} ${año}`,
+      semana: numeroSemana
     };
   };
 
   useEffect(() => {
-    if (formData.numero_mes && formData.año && formData.tipo_periodo) {
-      const rangoCalculado = formData.tipo_periodo === 'mensual' 
-        ? calcularRangoMes(formData.numero_mes, formData.año)
-        : calcularRangoSemana(formData.numero_mes, formData.mes_seleccionado, formData.año);
+    if (formData.año && formData.tipo_periodo) {
+      let rangoCalculado;
+      
+      if (formData.tipo_periodo === 'mensual' && formData.numero_mes) {
+        rangoCalculado = calcularRangoMes(formData.numero_mes, formData.año);
+      } else if (formData.tipo_periodo === 'semanal' && formData.numero_mes && formData.mes_seleccionado) {
+        rangoCalculado = calcularRangoSemana(formData.numero_mes, formData.mes_seleccionado, formData.año);
+      }
+      
+      if (rangoCalculado) {
       setFormData(prev => ({
         ...prev,
         nombre_mes: rangoCalculado.nombre_mes
       }));
+      }
     }
   }, [formData.numero_mes, formData.año, formData.tipo_periodo, formData.mes_seleccionado]);
 
@@ -367,11 +377,17 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
       
       if (editingId) {
         // Editar período existente
+        const rangoMes = formData.tipo_periodo === 'mensual' 
+          ? calcularRangoMes(formData.numero_mes, formData.año)
+          : calcularRangoSemana(formData.numero_mes, formData.mes_seleccionado, formData.año);
+        
         const { error } = await supabase
           .from('modulo_meses')
           .update({
-            numero_mes: formData.numero_mes,
+            numero_mes: formData.tipo_periodo === 'mensual' ? formData.numero_mes : formData.mes_seleccionado,
+            semana: formData.tipo_periodo === 'semanal' ? formData.numero_mes : null,
             nombre_mes: rangoMes.nombre_mes,
+            semana: rangoMes.semana,
             fecha_inicio: rangoMes.fecha_inicio,
             fecha_fin: rangoMes.fecha_fin,
             tipo_periodo: formData.tipo_periodo
@@ -382,12 +398,18 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
         setSuccessMessage('Período del módulo actualizado exitosamente');
       } else {
         // Crear nuevo período
+        const rangoMes = formData.tipo_periodo === 'mensual' 
+          ? calcularRangoMes(formData.numero_mes, formData.año)
+          : calcularRangoSemana(formData.numero_mes, formData.mes_seleccionado, formData.año);
+        
         const { error } = await supabase
           .from('modulo_meses')
           .insert({
             modulo_id: moduloId,
-            numero_mes: formData.numero_mes,
+            numero_mes: formData.tipo_periodo === 'mensual' ? formData.numero_mes : formData.mes_seleccionado,
+            semana: formData.tipo_periodo === 'semanal' ? formData.numero_mes : null,
             nombre_mes: rangoMes.nombre_mes,
+            semana: rangoMes.semana,
             fecha_inicio: rangoMes.fecha_inicio,
             fecha_fin: rangoMes.fecha_fin,
             total_inversion: 0,
@@ -422,21 +444,17 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
     const añoMatch = mes.nombre_mes.match(/\d{4}/);
     const año = añoMatch ? parseInt(añoMatch[0]) : new Date().getFullYear();
     
-    // Extraer mes seleccionado para períodos semanales
+    // Para períodos semanales, usar el numero_mes como mes seleccionado y semana como número de período
     let mesSeleccionado = new Date().getMonth() + 1;
+    let numeroPeriodo = mes.numero_mes;
+    
     if (mes.tipo_periodo === 'semanal') {
-      const mesMatch = mes.nombre_mes.match(/de (\w+)/);
-      if (mesMatch) {
-        const mesNombre = mesMatch[1];
-        const mesIndex = monthNames.findIndex(m => m === mesNombre);
-        if (mesIndex !== -1) {
-          mesSeleccionado = mesIndex + 1;
-        }
-      }
+      mesSeleccionado = mes.numero_mes; // El mes está en numero_mes
+      numeroPeriodo = mes.semana || 1; // La semana está en el campo semana
     }
     
     setFormData({
-      numero_mes: mes.numero_mes,
+      numero_mes: numeroPeriodo,
       nombre_mes: mes.nombre_mes,
       año: año,
       tipo_periodo: mes.tipo_periodo || 'mensual',
@@ -451,24 +469,37 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
     
     setDeletingWithRollback(true);
     try {
-      // Usar la función de rollback automático
-      const { data: result, error } = await supabase.rpc('eliminar_modulo_mes_con_rollback', {
-        p_modulo_mes_id: id,
-        p_admin_id: admin?.id
-      });
+      // Verificar si el período está procesado
+      if (mesAEliminar.procesado) {
+        // Si está procesado, usar función de rollback
+        const { data: result, error } = await supabase.rpc('rollback_periodo_modulo', {
+          p_modulo_id: moduloId,
+          p_numero_mes: mesAEliminar.numero_mes,
+          p_admin_id: admin?.id
+        });
 
-      if (error) throw error;
-      
-      const rollbackResult = result?.[0];
-      if (!rollbackResult?.success) {
-        throw new Error(rollbackResult?.message || 'Error en el proceso de eliminación');
+        if (error) {
+          console.error('Error en rollback:', error);
+          // Si la función de rollback falla, intentar eliminación directa
+          await eliminarPeriodoDirecto(id);
+        } else {
+          const rollbackResult = result?.[0];
+          if (!rollbackResult?.success) {
+            throw new Error(rollbackResult?.message || 'Error en el proceso de rollback');
+          }
+        }
+      } else {
+        // Si no está procesado, eliminar directamente
+        await eliminarPeriodoDirecto(id);
       }
       
       setShowDeleteModal(null);
       await fetchMeses();
       await fetchSiguienteNumero();
       await checkTipoPeriodoExistente();
-      setSuccessMessage(rollbackResult.message || 'Período del módulo eliminado exitosamente con rollback automático.');
+      setSuccessMessage(mesAEliminar.procesado 
+        ? 'Período del módulo eliminado exitosamente con rollback automático.'
+        : 'Período del módulo eliminado exitosamente.');
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error deleting modulo mes:', error);
@@ -478,6 +509,20 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
     }
   };
 
+  const eliminarPeriodoDirecto = async (periodoId: string) => {
+    try {
+      // Eliminar el período directamente de la tabla
+      const { error } = await supabase
+        .from('modulo_meses')
+        .delete()
+        .eq('id', periodoId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error eliminando período directamente:', error);
+      throw error;
+    }
+  };
   const resetForm = () => {
     setFormData({
       numero_mes: siguienteNumero > 0 ? siguienteNumero : 1,
@@ -505,14 +550,17 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
 
   const getMesData = (numeroMes: number) => {
     if (tipoPeriodo === 'mensual') {
-      return meses.find(m => m.numero_mes === numeroMes && m.tipo_periodo === 'mensual');
-    } else {
-      // Para semanal, buscar por número de semana Y mes seleccionado
-      const mesNombre = monthNames[selectedMonth - 1];
       return meses.find(m => 
         m.numero_mes === numeroMes && 
+        m.tipo_periodo === 'mensual' && 
+        m.semana === null
+      );
+    } else {
+      // Para semanal, buscar por mes seleccionado y número de semana
+      return meses.find(m =>
+        m.numero_mes === selectedMonth &&
+        m.semana === numeroMes &&
         m.tipo_periodo === 'semanal' &&
-        m.nombre_mes.includes(mesNombre) &&
         m.nombre_mes.includes(currentYear.toString())
       );
     }
@@ -773,16 +821,11 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
           <div className="text-blue-100 text-sm space-y-1">
             {tipoPeriodo === 'mensual' ? (
               <>
-                <p>• Los períodos mensuales van del día 1 al último día de cada mes</p>
-                <p>• Ideal para ganancias que se procesan mensualmente</p>
-                <p>• Máximo 12 períodos por año</p>
+              
               </>
             ) : (
               <>
-                <p>• Los períodos semanales van de lunes a domingo</p>
-                <p>• Selecciona el mes y luego la semana específica</p>
-                <p>• Ideal para ganancias que se procesan semanalmente</p>
-                <p>• Mostrando semanas de: <strong>{monthNames[selectedMonth - 1]}</strong></p>
+                
               </>
             )}
             {tipoPeriodoLocked && (
@@ -853,11 +896,21 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-gray-700 text-sm font-medium mb-2">
-                    {formData.tipo_periodo === 'mensual' ? 'Mes' : 'Semana'}
+                    {formData.tipo_periodo === 'mensual' ? 'Mes' : 'Número de Semana'}
                   </label>
                   <select
-                    value={formData.numero_mes}
-                    onChange={(e) => setFormData({...formData, numero_mes: parseInt(e.target.value)})}
+                    value={formData.tipo_periodo === 'mensual' ? formData.numero_mes : formData.numero_mes}
+                    onChange={(e) => {
+                      if (formData.tipo_periodo === 'mensual') {
+                        setFormData({...formData, numero_mes: parseInt(e.target.value)});
+                      } else {
+                        // Para semanal, el numero_mes será el mes seleccionado y el valor será la semana
+                        setFormData({
+                          ...formData, 
+                          numero_mes: parseInt(e.target.value) // Este será el número de semana para el display
+                        });
+                      }
+                    }}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
@@ -904,23 +957,7 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
                   placeholder="Se genera automáticamente"
                 />
               </div>
-
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h4 className="text-blue-800 font-medium mb-2">Configuración para {moduloNombre}</h4>
-                <ul className="text-blue-700 text-sm space-y-1">
-                  <li>• Período {formData.tipo_periodo} específico para este módulo independiente</li>
-                  <li>• Las ganancias se procesarán {formData.tipo_periodo === 'mensual' ? 'mensualmente' : 'semanalmente'} por separado del sistema principal</li>
-                  <li>• Solo afectará a usuarios asignados a este módulo</li>
-                  {formData.tipo_periodo === 'semanal' && (
-                    <>
-                      <li>• Las semanas van de lunes a domingo dentro del mes seleccionado</li>
-                      <li>• Puedes cambiar de mes para gestionar semanas de diferentes meses</li>
-                      <li>• Cada mes puede tener entre 4-6 semanas dependiendo del calendario</li>
-                    </>
-                  )}
-                </ul>
-              </div>
-              
+             
               <div className="flex space-x-4 pt-4">
                 <button
                   type="submit"

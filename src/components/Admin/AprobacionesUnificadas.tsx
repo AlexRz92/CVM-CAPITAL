@@ -31,6 +31,7 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
   const [showRejectModal, setShowRejectModal] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [activeTab, setActiveTab] = useState<'pendientes' | 'procesadas'>('pendientes');
+  const [beneficiarioSolicitudes, setBeneficiarioSolicitudes] = useState<any[]>([]);
 
   useEffect(() => {
     fetchSolicitudes();
@@ -178,6 +179,44 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
         }
       });
 
+      // 5. Solicitudes de cambio de beneficiario
+      try {
+        const { data: solicitudesBeneficiario, error: errorBeneficiario } = await supabase
+          .from('beneficiario_cambios')
+          .select(`
+            *,
+            inversores (
+              nombre,
+              apellido,
+              email
+            )
+          `)
+          .order('fecha_solicitud', { ascending: false });
+
+        if (!errorBeneficiario && solicitudesBeneficiario) {
+          solicitudesBeneficiario.forEach(solicitud => {
+            if (solicitud.inversores) {
+              solicitudesUnificadas.push({
+                id: solicitud.id,
+                usuario_id: solicitud.inversor_id,
+                usuario_tipo: 'inversor',
+                tipo: 'cambio_beneficiario',
+                monto: 0, // No aplica para cambios de beneficiario
+                estado: solicitud.estado,
+                fecha_solicitud: solicitud.fecha_solicitud,
+                motivo_rechazo: solicitud.motivo_rechazo,
+                notas: `Cambio de beneficiario: ${solicitud.nuevo_beneficiario_nombre} ${solicitud.nuevo_beneficiario_apellido}`,
+                origen: 'beneficiario',
+                usuario_nombre: `${solicitud.inversores.nombre} ${solicitud.inversores.apellido}`
+              });
+            }
+          });
+        }
+      } catch (beneficiarioError) {
+        console.error('Error fetching beneficiario changes (table may not exist):', beneficiarioError);
+        // Continuar sin las solicitudes de beneficiario si la tabla no existe
+      }
+
       // Ordenar por fecha
       solicitudesUnificadas.sort((a, b) => 
         new Date(b.fecha_solicitud).getTime() - new Date(a.fecha_solicitud).getTime()
@@ -192,6 +231,9 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
   };
 
   const getTableName = (solicitud: SolicitudUnificada) => {
+    if (solicitud.tipo === 'cambio_beneficiario') {
+      return 'beneficiario_cambios';
+    }
     if (solicitud.origen === 'principal') {
       return solicitud.usuario_tipo === 'inversor' ? 'solicitudes' : 'partner_solicitudes';
     } else {
@@ -200,31 +242,36 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
   };
 
   const handleApprove = async (solicitud: SolicitudUnificada) => {
-    if (admin?.role !== 'admin') return;
+    if (!admin) return;
     
     setProcessingId(solicitud.id);
     try {
       const tableName = getTableName(solicitud);
       
-      // Actualizar estado de la solicitud
-      const { error: updateError } = await supabase
-        .from(tableName)
-        .update({
-          estado: 'aprobado',
-          fecha_procesado: new Date().toISOString(),
-          procesado_por: admin.id
-        })
-        .eq('id', solicitud.id);
-
-      if (updateError) throw updateError;
-
-      // Procesar la transacción según el tipo
-      if (solicitud.tipo === 'transferencia') {
-        // Procesar transferencia entre módulos
-        await procesarTransferencia(solicitud);
+      if (solicitud.tipo === 'cambio_beneficiario') {
+        // Procesar cambio de beneficiario
+        await procesarCambioBeneficiario(solicitud);
       } else {
-        // Procesar depósito o retiro normal
-        await procesarTransaccion(solicitud);
+        // Actualizar estado de la solicitud
+        const { error: updateError } = await supabase
+          .from(tableName)
+          .update({
+            estado: 'aprobado',
+            fecha_procesado: new Date().toISOString(),
+            procesado_por: admin.id
+          })
+          .eq('id', solicitud.id);
+
+        if (updateError) throw updateError;
+
+        // Procesar la transacción según el tipo
+        if (solicitud.tipo === 'transferencia') {
+          // Procesar transferencia entre módulos
+          await procesarTransferencia(solicitud);
+        } else {
+          // Procesar depósito o retiro normal
+          await procesarTransaccion(solicitud);
+        }
       }
 
       fetchSolicitudes();
@@ -237,8 +284,70 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
     }
   };
 
+  const procesarCambioBeneficiario = async (solicitud: SolicitudUnificada) => {
+    try {
+      // Obtener los nuevos datos del beneficiario
+      const { data: cambioData, error: cambioError } = await supabase
+        .from('beneficiario_cambios')
+        .select('*')
+        .eq('id', solicitud.id)
+        .single();
+
+      if (cambioError) throw cambioError;
+
+      // Actualizar los datos del beneficiario en la tabla inversores
+      const { error: updateInversorError } = await supabase
+        .from('inversores')
+        .update({
+          beneficiario_nombre: cambioData.nuevo_beneficiario_nombre,
+          beneficiario_apellido: cambioData.nuevo_beneficiario_apellido,
+          beneficiario_telefono: cambioData.nuevo_beneficiario_telefono,
+          beneficiario_email: cambioData.nuevo_beneficiario_email
+        })
+        .eq('id', solicitud.usuario_id);
+
+      if (updateInversorError) throw updateInversorError;
+
+      // Actualizar estado de la solicitud de cambio
+      const { error: updateSolicitudError } = await supabase
+        .from('beneficiario_cambios')
+        .update({
+          estado: 'aprobado',
+          fecha_procesado: new Date().toISOString(),
+          procesado_por: admin?.id
+        })
+        .eq('id', solicitud.id);
+
+      if (updateSolicitudError) throw updateSolicitudError;
+
+      // Crear notificación para el inversor
+      try {
+        const { error: notificationError } = await supabase
+          .from('notificaciones')
+          .insert({
+            usuario_id: solicitud.usuario_id,
+            tipo_usuario: 'inversor',
+            titulo: 'Beneficiario Actualizado',
+            mensaje: `Los datos de tu beneficiario han sido actualizados exitosamente: ${cambioData.nuevo_beneficiario_nombre} ${cambioData.nuevo_beneficiario_apellido}.`,
+            tipo_notificacion: 'success',
+            leida: false,
+            fecha_creacion: new Date().toISOString()
+          });
+
+        if (notificationError) {
+          console.error('Error creating notification:', notificationError);
+        }
+      } catch (notifError) {
+        console.error('Error creating notification (table may not exist):', notifError);
+      }
+    } catch (error) {
+      console.error('Error procesando cambio de beneficiario:', error);
+      throw error;
+    }
+  };
+
   const handleReject = async () => {
-    if (!showRejectModal || admin?.role !== 'admin') return;
+    if (!showRejectModal || !admin) return;
     
     const solicitud = solicitudes.find(s => s.id === showRejectModal);
     if (!solicitud) return;
@@ -301,6 +410,7 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
   };
 
   const getTypeColor = (tipo: string) => {
+    if (tipo === 'cambio_beneficiario') return 'text-purple-300';
     return tipo === 'deposito' ? 'text-green-300' : 'text-red-300';
   };
 
@@ -544,9 +654,12 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                           <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                             solicitud.origen === 'modulo'
                               ? 'bg-green-500/20 text-green-300 border border-green-500/50'
+                              : solicitud.tipo === 'cambio_beneficiario'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50'
                               : 'bg-gray-500/20 text-gray-300 border border-gray-500/50'
                           }`}>
                             {solicitud.tipo === 'transferencia' ? 'TRANSFERENCIA' : 
+                             solicitud.tipo === 'cambio_beneficiario' ? 'BENEFICIARIO' :
                              solicitud.origen === 'modulo' ? 'MÓDULO' : 'PRINCIPAL'}
                           </span>
                         </div>
@@ -559,6 +672,8 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                                 `Transferencia: ${solicitud.notas.split('Transferencia de ')[1]?.split('. Origen:')[0] || 'Entre módulos'}` :
                                 'Transferencia entre módulos'
                               ) :
+                             solicitud.tipo === 'cambio_beneficiario' ? 
+                               'Cambio de Beneficiario' :
                              solicitud.origen === 'modulo' && solicitud.modulo_nombre 
                               ? `Módulo: ${solicitud.modulo_nombre}`
                               : 'Dashboard Principal'
@@ -569,12 +684,23 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                     </div>
                     
                     <div className="flex items-center space-x-6">
-                      <div className="text-right">
-                        <p className={`font-bold text-lg ${getTypeColor(solicitud.tipo)}`}>
-                          {formatCurrency(solicitud.monto)}
-                        </p>
-                        <p className="text-white/70 text-sm capitalize">{solicitud.tipo}</p>
-                      </div>
+                      {solicitud.tipo !== 'cambio_beneficiario' && (
+                        <div className="text-right">
+                          <p className={`font-bold text-lg ${getTypeColor(solicitud.tipo)}`}>
+                            {formatCurrency(solicitud.monto)}
+                          </p>
+                          <p className="text-white/70 text-sm capitalize">{solicitud.tipo}</p>
+                        </div>
+                      )}
+                      
+                      {solicitud.tipo === 'cambio_beneficiario' && (
+                        <div className="text-right">
+                          <p className="text-purple-300 font-bold text-sm">
+                            Cambio de Beneficiario
+                          </p>
+                          <p className="text-white/70 text-xs">Requiere aprobación</p>
+                        </div>
+                      )}
                       
                       <div className="text-right">
                         <p className="text-white/80 text-sm">
@@ -585,7 +711,7 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                         </span>
                       </div>
                       
-                      {admin?.role === 'admin' && (
+                      {admin && (
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => handleApprove(solicitud)}
@@ -656,16 +782,21 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                           <span className={`px-2 py-1 rounded-full text-xs font-bold ${
                             solicitud.origen === 'modulo'
                               ? 'bg-green-500/20 text-green-300 border border-green-500/50'
+                              : solicitud.tipo === 'cambio_beneficiario'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/50'
                               : 'bg-gray-500/20 text-gray-300 border border-gray-500/50'
                           }`}>
-                            {solicitud.origen === 'modulo' ? 'MÓDULO' : 'PRINCIPAL'}
+                            {solicitud.tipo === 'cambio_beneficiario' ? 'BENEFICIARIO' :
+                             solicitud.origen === 'modulo' ? 'MÓDULO' : 'PRINCIPAL'}
                           </span>
                         </div>
                         
                         <div className="flex items-center space-x-2 text-white/60 text-sm">
                           {getOrigenIcon(solicitud.origen)}
                           <span>
-                            {solicitud.origen === 'modulo' && solicitud.modulo_nombre 
+                            {solicitud.tipo === 'cambio_beneficiario' ? 
+                              'Cambio de Beneficiario' :
+                             solicitud.origen === 'modulo' && solicitud.modulo_nombre 
                               ? `Módulo: ${solicitud.modulo_nombre}`
                               : 'Dashboard Principal'
                             }
@@ -675,12 +806,23 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                     </div>
                     
                     <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className={`font-semibold ${getTypeColor(solicitud.tipo)}`}>
-                          {formatCurrency(solicitud.monto)}
-                        </p>
-                        <p className="text-white/60 text-sm capitalize">{solicitud.tipo}</p>
-                      </div>
+                      {solicitud.tipo !== 'cambio_beneficiario' && (
+                        <div className="text-right">
+                          <p className={`font-semibold ${getTypeColor(solicitud.tipo)}`}>
+                            {formatCurrency(solicitud.monto)}
+                          </p>
+                          <p className="text-white/60 text-sm capitalize">{solicitud.tipo}</p>
+                        </div>
+                      )}
+                      
+                      {solicitud.tipo === 'cambio_beneficiario' && (
+                        <div className="text-right">
+                          <p className="text-purple-300 font-semibold text-sm">
+                            Beneficiario
+                          </p>
+                          <p className="text-white/60 text-xs">Cambio de datos</p>
+                        </div>
+                      )}
                       
                       <div className="text-right">
                         <span className={`px-2 py-1 rounded-full text-xs font-bold border ${getStatusColor(solicitud.estado)}`}>
@@ -705,6 +847,14 @@ const AprobacionesUnificadas: React.FC<AprobacionesUnificadasProps> = ({ onStats
                     <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                       <p className="text-blue-300 text-sm">
                         <strong>Detalles de transferencia:</strong> {solicitud.notas}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {solicitud.tipo === 'cambio_beneficiario' && solicitud.notas && (
+                    <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                      <p className="text-purple-300 text-sm">
+                        <strong>Nuevo beneficiario:</strong> {solicitud.notas}
                       </p>
                     </div>
                   )}

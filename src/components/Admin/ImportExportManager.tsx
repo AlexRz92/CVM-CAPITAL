@@ -46,7 +46,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         .eq('nombre', 'C.V.M Capital')
         .eq('activo', true)
         .single();
-
       if (error) {
         console.error('Error fetching default module:', error);
         return;
@@ -80,7 +79,7 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
     
     // Validar headers requeridos
     const requiredHeaders = ['nombre', 'apellido', 'email'];
-    const optionalHeaders = ['deposito', 'retiro', 'ganancia'];
+    const optionalHeaders = ['deposito', 'pais', 'telegram', 'beneficiario nombre', 'beneficiario apellido', 'beneficiario teléfono', 'beneficiario email'];
     
     for (const header of requiredHeaders) {
       if (!headers.includes(header)) {
@@ -95,13 +94,33 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
 
       const inversor: any = {};
       headers.forEach((header, index) => {
-        if (requiredHeaders.includes(header)) {
-          inversor[header] = values[index] || '';
-        } else if (optionalHeaders.includes(header)) {
-          inversor[header] = parseFloat(values[index]) || 0;
+        const value = values[index] || '';
+        
+        switch (header) {
+          case 'nombre':
+          case 'apellido':
+          case 'email':
+          case 'pais':
+          case 'telegram':
+            inversor[header] = value;
+            break;
+          case 'deposito':
+            inversor[header] = parseFloat(value) || 0;
+            break;
+          case 'beneficiario nombre':
+            inversor['beneficiario_nombre'] = value;
+            break;
+          case 'beneficiario apellido':
+            inversor['beneficiario_apellido'] = value;
+            break;
+          case 'beneficiario teléfono':
+            inversor['beneficiario_telefono'] = value;
+            break;
+          case 'beneficiario email':
+            inversor['beneficiario_email'] = value;
+            break;
         }
       });
-
       if (inversor.nombre && inversor.apellido && inversor.email) {
         inversores.push(inversor);
       }
@@ -144,7 +163,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         total_errores: 0,
         detalles: [] as any[]
       };
-
       for (const inv of inversores) {
         try {
           // Verificar si el email ya existe
@@ -153,7 +171,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             .select('id')
             .eq('email', inv.email.toLowerCase())
             .maybeSingle();
-
           if (checkError) {
             throw new Error(`Error verificando email: ${checkError.message}`);
           }
@@ -172,24 +189,26 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
           const salt = generateSalt();
           const hashedPassword = hashPassword('cvmcapital', salt);
 
-          // Insertar nuevo inversor (SIN capital_inicial)
+          // Insertar nuevo inversor
           const { data: newUser, error: insertError } = await supabase
             .from('inversores')
             .insert({
               nombre: inv.nombre,
               apellido: inv.apellido,
               email: inv.email.toLowerCase(),
+              pais: inv.pais || 'No especificado',
+              telegram_username: inv.telegram || '',
               password_hash: hashedPassword,
               password_salt: salt,
               pregunta_secreta: '¿Cuál es tu comida favorita?',
               respuesta_secreta: 'pizza',
-              capital_inicial2: 0,
-              ganancia_semanal2: 0,
-              total: 0
+              beneficiario_nombre: inv.beneficiario_nombre || '',
+              beneficiario_apellido: inv.beneficiario_apellido || '',
+              beneficiario_telefono: inv.beneficiario_telefono || '',
+              beneficiario_email: inv.beneficiario_email || ''
             })
             .select()
             .single();
-
           if (insertError) {
             throw new Error(`Error insertando usuario: ${insertError.message}`);
           }
@@ -204,54 +223,25 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
               fecha_asignacion: new Date().toISOString(),
               asignado_por: admin?.id
             });
-
           if (assignError && assignError.code !== '23505') { // Ignorar error de duplicado
             console.error('Error asignando al módulo predeterminado:', assignError);
           }
 
-          // Crear transacciones en modulo_transacciones si se especificaron
-          const transaccionesModulo = [];
+          // Crear depósito en modulo_transacciones si se especificó
           if (inv.deposito && inv.deposito > 0) {
-            transaccionesModulo.push({
-              modulo_id: defaultModuleId,
-              inversor_id: newUser.id,
-              usuario_tipo: 'inversor',
-              monto: inv.deposito,
-              tipo: 'deposito',
-              descripcion: 'Depósito inicial - Importación CSV',
-              fecha: new Date().toISOString()
-            });
-          }
-          if (inv.retiro && inv.retiro > 0) {
-            transaccionesModulo.push({
-              modulo_id: defaultModuleId,
-              inversor_id: newUser.id,
-              usuario_tipo: 'inversor',
-              monto: inv.retiro,
-              tipo: 'retiro',
-              descripcion: 'Retiro - Importación CSV',
-              fecha: new Date().toISOString()
-            });
-          }
-          if (inv.ganancia && inv.ganancia > 0) {
-            transaccionesModulo.push({
-              modulo_id: defaultModuleId,
-              inversor_id: newUser.id,
-              usuario_tipo: 'inversor',
-              monto: inv.ganancia,
-              tipo: 'ganancia',
-              descripcion: 'Ganancia - Importación CSV',
-              fecha: new Date().toISOString()
-            });
-          }
-
-          if (transaccionesModulo.length > 0) {
             const { error: transModuloError } = await supabase
               .from('modulo_transacciones')
-              .insert(transaccionesModulo);
-
+              .insert({
+                modulo_id: defaultModuleId,
+                inversor_id: newUser.id,
+                usuario_tipo: 'inversor',
+                monto: inv.deposito,
+                tipo: 'deposito',
+                descripcion: 'Depósito inicial - Importación CSV',
+                fecha: new Date().toISOString()
+              });
             if (transModuloError) {
-              console.error('Error insertando transacciones del módulo:', transModuloError);
+              console.error('Error insertando depósito del módulo:', transModuloError);
             }
           }
 
@@ -259,9 +249,8 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
           results.detalles.push({
             email: inv.email,
             status: 'exitoso',
-            mensaje: `Usuario creado exitosamente y asignado al módulo C.V.M Capital${transaccionesModulo.length > 0 ? ` con ${transaccionesModulo.length} transacciones` : ''}`
+            mensaje: `Usuario creado exitosamente y asignado al módulo C.V.M Capital${inv.deposito > 0 ? ` con depósito de ${inv.deposito}` : ''}`
           });
-
         } catch (error) {
           results.total_errores++;
           results.detalles.push({
@@ -276,7 +265,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
       setShowImportModal(false);
       setSelectedFile(null);
       onUpdate();
-
     } catch (error) {
       console.error('Error importing inversores:', error);
       showError(
@@ -291,41 +279,45 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
   const handleExportInversores = async () => {
     setExporting(true);
     try {
-      // Obtener inversores con sus transacciones calculadas
+      // Obtener inversores con todos sus datos
       const { data: inversores, error: inversoresError } = await supabase
         .from('inversores')
-        .select('id, nombre, apellido, email, total, created_at')
+        .select('id, nombre, apellido, email, pais, telegram_username, beneficiario_nombre, beneficiario_apellido, beneficiario_telefono, beneficiario_email, created_at')
         .order('created_at', { ascending: false });
-
       if (inversoresError) throw inversoresError;
 
-      // Para cada inversor, calcular sus totales desde transacciones
+      // Para cada inversor, calcular su saldo total desde transacciones
       const inversoresConTotales = await Promise.all(
         (inversores || []).map(async (inversor) => {
-          // Obtener transacciones del inversor
-          const { data: transacciones, error: transError } = await supabase
+          // Obtener transacciones principales del inversor
+          const { data: transaccionesPrincipales, error: errorPrincipal } = await supabase
             .from('transacciones')
             .select('monto, tipo')
             .eq('inversor_id', inversor.id)
             .eq('usuario_tipo', 'inversor');
 
-          if (transError) {
-            console.error('Error fetching transactions for inversor:', inversor.id, transError);
-            return {
-              ...inversor,
-              deposito: 0,
-              retiro: 0,
-              ganancia_total: 0,
-              saldo_actual: inversor.total || 0
-            };
+          if (errorPrincipal) {
+            console.error('Error fetching principal transactions for inversor:', inversor.id, errorPrincipal);
           }
 
-          // Calcular totales por tipo
+          // Obtener transacciones de módulos del inversor
+          const { data: transaccionesModulos, error: errorModulos } = await supabase
+            .from('modulo_transacciones')
+            .select('monto, tipo')
+            .eq('inversor_id', inversor.id)
+            .eq('usuario_tipo', 'inversor');
+
+          if (errorModulos) {
+            console.error('Error fetching module transactions for inversor:', inversor.id, errorModulos);
+          }
+
+          // Calcular totales por tipo (principales + módulos)
           let deposito = 0;
           let retiro = 0;
           let ganancia_total = 0;
 
-          transacciones?.forEach(t => {
+          // Procesar transacciones principales
+          transaccionesPrincipales?.forEach(t => {
             switch (t.tipo.toLowerCase()) {
               case 'deposito':
                 deposito += Number(t.monto);
@@ -339,42 +331,69 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             }
           });
 
+          // Procesar transacciones de módulos
+          transaccionesModulos?.forEach(t => {
+            switch (t.tipo.toLowerCase()) {
+              case 'deposito':
+                deposito += Number(t.monto);
+                break;
+              case 'retiro':
+                retiro += Number(t.monto);
+                break;
+              case 'ganancia':
+                ganancia_total += Number(t.monto);
+                break;
+            }
+          });
+
+          // Calcular saldo actual (deposito + ganancia - retiro)
+          const saldo_actual = deposito + ganancia_total - retiro;
           return {
             ...inversor,
-            deposito,
-            retiro,
-            ganancia_total,
-            saldo_actual: inversor.total || 0
+            deposito: saldo_actual, // Saldo actual como "depósito" para el CSV
+            saldo_actual
           };
         })
       );
 
-      // Convertir a CSV
-      const headers = ['Nombre', 'Apellido', 'Email', 'Depósito', 'Retiro', 'Ganancia Total', 'Saldo Actual'];
+      // Convertir a CSV con el formato solicitado
+      const headers = [
+        'Nombre', 
+        'Apellido', 
+        'Email', 
+        'País', 
+        'Telegram', 
+        'Deposito', 
+        'Beneficiario Nombre', 
+        'Beneficiario Apellido', 
+        'Beneficiario Teléfono', 
+        'Beneficiario Email'
+      ];
       const csvContent = [
         headers.join(','),
         ...inversoresConTotales.map((row: any) => [
-          row.nombre,
-          row.apellido,
-          row.email,
-          row.deposito.toFixed(2),
-          row.retiro.toFixed(2),
-          row.ganancia_total.toFixed(2),
-          row.saldo_actual.toFixed(2)
+          row.nombre || '',
+          row.apellido || '',
+          row.email || '',
+          row.pais || '',
+          row.telegram_username || '',
+          row.saldo_actual.toFixed(2),
+          row.beneficiario_nombre || '',
+          row.beneficiario_apellido || '',
+          row.beneficiario_telefono || '',
+          row.beneficiario_email || ''
         ].join(','))
       ].join('\n');
-
       // Descargar archivo
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `inversores_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `inversores_completo_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
     } catch (error) {
       console.error('Error exporting inversores:', error);
       showError(
@@ -394,7 +413,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         .from('partners')
         .select('id, nombre, username, created_at')
         .order('created_at', { ascending: false });
-
       if (partnersError) throw partnersError;
 
       // Para cada partner, calcular sus totales desde transacciones
@@ -425,7 +443,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
           let deposito = 0;
           let retiro = 0;
           let ganancia_total = 0;
-
           transacciones?.forEach(t => {
             switch (t.tipo.toLowerCase()) {
               case 'deposito':
@@ -443,10 +460,8 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
                 break;
             }
           });
-
           // Calcular saldo actual
           const saldo_actual = inversion_inicial + deposito + ganancia_total - retiro;
-
           return {
             ...partner,
             tipo: 'Partner',
@@ -474,7 +489,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
           row.saldo_actual.toFixed(2)
         ].join(','))
       ].join('\n');
-
       // Descargar archivo
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -485,7 +499,6 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
     } catch (error) {
       console.error('Error exporting partners:', error);
       showError(
@@ -529,24 +542,27 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
           <h4 className="text-yellow-300 font-semibold mb-2">Formato CSV para Importación</h4>
           <p className="text-yellow-200 text-sm mb-2">
-            <strong>Columnas requeridas:</strong> nombre,apellido,email
+            <strong>Columnas requeridas:</strong> nombre, apellido, email
           </p>
           <p className="text-yellow-200 text-sm mb-2">
-            <strong>Columnas opcionales:</strong> deposito,retiro,ganancia
+            <strong>Columnas opcionales:</strong> deposito, pais, telegram, beneficiario nombre, beneficiario apellido, beneficiario teléfono, beneficiario email
           </p>
           <p className="text-yellow-200 text-sm mb-2">
             <strong>Ejemplo de formato correcto:</strong>
           </p>
           <div className="bg-black/20 p-2 rounded text-xs text-yellow-100 font-mono">
-            nombre,apellido,email,deposito,retiro,ganancia<br/>
-            Juan,Pérez,juan@email.com,1000,0,0<br/>
-            María,García,maria@email.com,500,100,200
+            nombre,apellido,email,deposito,pais,telegram,beneficiario nombre,beneficiario apellido,beneficiario teléfono,beneficiario email<br/>
+            Juan,Pérez,juan@email.com,1000,México,@juan_telegram,Ana,Pérez,+1234567890,ana@email.com<br/>
+            María,García,maria@email.com,500,España,@maria_telegram,Carlos,García,+0987654321,carlos@email.com
           </div>
           <p className="text-yellow-200 text-sm mt-2">
             <strong>Contraseña temporal:</strong> "cvmcapital" (debe cambiarse en el primer login)
           </p>
           <p className="text-yellow-200 text-sm">
             <strong>Pregunta temporal:</strong> "¿Cuál es tu comida favorita?" con respuesta "pizza"
+          </p>
+          <p className="text-yellow-200 text-sm">
+            <strong>Depósito:</strong> Se registrará en el módulo "C.V.M Capital" como transacción de depósito
           </p>
         </div>
       </div>
@@ -600,9 +616,8 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             <div className="mb-4 p-4 bg-blue-50 rounded-lg">
               <h4 className="text-blue-800 font-semibold mb-2">Formato esperado:</h4>
               <code className="text-sm text-blue-700 block bg-white p-2 rounded border">
-                nombre,apellido,email,deposito,retiro,ganancia<br/>
-                Juan,Pérez,juan@email.com,1000,0,0<br/>
-                María,García,maria@email.com,500,100,200
+                nombre,apellido,email,deposito,pais,telegram,beneficiario nombre,beneficiario apellido,beneficiario teléfono,beneficiario email<br/>
+                Juan,Pérez,juan@email.com,1000,México,@juan_telegram,Ana,Pérez,+1234567890,ana@email.com
               </code>
               <div className="mt-3 text-sm text-blue-700">
                 <p><strong>Nota importante:</strong></p>
@@ -683,7 +698,7 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
                 <p className="text-yellow-800 text-sm">
                   <strong>Recordatorio:</strong> Los inversores importados tienen la contraseña temporal "cvmcapital" 
                   y deben cambiarla junto con la pregunta de seguridad en su primer login. Los inversores han sido 
-                  asignados automáticamente al módulo "C.V.M Capital\" y las transacciones se han registrado en dicho módulo.
+                  asignados automáticamente al módulo "C.V.M Capital" y las transacciones se han registrado en dicho módulo.
                 </p>
               </div>
             )}
