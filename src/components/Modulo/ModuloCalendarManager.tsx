@@ -259,7 +259,7 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
         .select('numero_mes, semana')
         .eq('modulo_id', moduloId)
         .eq('tipo_periodo', 'mensual')
-        .whereNull('semana')
+        .is('semana', null)
         .order('numero_mes', { ascending: false })
         .limit(1);
       
@@ -272,7 +272,7 @@ const ModuloCalendarManager: React.FC<ModuloCalendarManagerProps> = ({ moduloId,
           .select('id')
           .eq('modulo_id', moduloId)
           .eq('tipo_periodo', 'mensual')
-          .whereNull('semana')
+          .is('semana', null)
           .eq('procesado', false)
           .limit(1);
         

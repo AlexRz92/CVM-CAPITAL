@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../contexts/AdminContext';
 import { supabase } from '../../config/supabase';
-import { AdminHeader, UsuariosManager, AprobacionesUnificadas, TicketsList, ImportExportManager, ModuloAdministracion } from './';
-import RegistroSolicitudesManager from './RegistroSolicitudesManager';
-import OperadorGananciasViewer from './OperadorGananciasViewer';
+import { AdminHeader, UsuariosManager, AprobacionesUnificadas, TicketsList, AdministracionPanel, ImportExportManager, ModuloAdministracion } from './';
+import { RetirosDirectos, PausarGanancias } from './';
 import { 
   Users, 
   CheckCircle, 
@@ -17,9 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  Settings,
   RotateCcw,
-  UserPlus,
-  Calculator
+  ArrowDownCircle,
+  Pause
 } from 'lucide-react';
 
 interface SuccessModalProps {
@@ -63,8 +63,7 @@ const Operaciones: React.FC = () => {
     totalInversores: 0,
     totalPartners: 0,
     solicitudesPendientes: 0,
-    ticketsPendientes: 0,
-    registrosPendientes: 0
+    ticketsPendientes: 0
   });
 
   useEffect(() => {
@@ -114,16 +113,6 @@ const Operaciones: React.FC = () => {
         console.error('Error fetching tickets count:', ticketsError);
       }
 
-      // Solicitudes de registro pendientes
-      const { count: registrosCount, error: registrosError } = await supabase
-        .from('registro_solicitudes')
-        .select('*', { count: 'exact', head: true })
-        .eq('estado', 'pendiente');
-
-      if (registrosError) {
-        console.error('Error fetching registro solicitudes count:', registrosError);
-      }
-
       const totalSolicitudesPendientes = (solicitudesCount || 0) + 
                                         (solicitudesPartnersCount || 0) + 
                                         (solicitudesModulosInversoresCount || 0) + 
@@ -132,8 +121,7 @@ const Operaciones: React.FC = () => {
         totalInversores: inversoresCount || 0,
         totalPartners: partnersCount || 0,
         solicitudesPendientes: totalSolicitudesPendientes,
-        ticketsPendientes: ticketsCount || 0,
-        registrosPendientes: registrosCount || 0
+        ticketsPendientes: ticketsCount || 0
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -196,18 +184,18 @@ const Operaciones: React.FC = () => {
       description: 'Revertir períodos procesados'
     },
     { 
-      id: 'registro', 
-      label: 'Solicitudes de Registro', 
-      icon: UserPlus, 
-      count: stats.registrosPendientes,
-      description: 'Gestionar registros públicos'
+      id: 'retiros', 
+      label: 'Retiros Directos', 
+      icon: ArrowDownCircle, 
+      count: 0,
+      description: 'Crear retiros directos a inversores'
     },
     { 
-      id: 'operador-ganancias', 
-      label: 'Propuestas del Operador', 
-      icon: Calculator, 
+      id: 'pausar', 
+      label: 'Pausar Ganancias', 
+      icon: Pause, 
       count: 0,
-      description: 'Revisar propuestas de ganancias'
+      description: 'Gestionar pausas de ganancias'
     }
   ];
 
@@ -323,8 +311,8 @@ const Operaciones: React.FC = () => {
             {activeTab === 'modulos' && <ModuloAdministracion onUpdate={fetchStats} />}
             {activeTab === 'importexport' && <ImportExportManager onUpdate={fetchStats} />}
             {activeTab === 'rollback' && <RollbackManager onUpdate={fetchStats} />}
-            {activeTab === 'registro' && <RegistroSolicitudesManager onUpdate={fetchStats} />}
-            {activeTab === 'operador-ganancias' && <OperadorGananciasViewer onUpdate={fetchStats} />}
+            {activeTab === 'retiros' && <RetirosDirectos onUpdate={fetchStats} />}
+            {activeTab === 'pausar' && <PausarGanancias onUpdate={fetchStats} />}
           </div>
         </div>
       </div>
