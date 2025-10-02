@@ -2,25 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAdmin } from '../../contexts/AdminContext';
 import { supabase } from '../../config/supabase';
 import { AdminHeader, UsuariosManager, AprobacionesUnificadas, TicketsList, AdministracionPanel, ImportExportManager, ModuloAdministracion } from './';
-import { RetirosDirectos, PausarGanancias } from './';
-import { 
-  Users, 
-  CheckCircle, 
-  UsersIcon, 
-  HelpCircle, 
-  DollarSign, 
-  Upload,
-  Package,
-  Menu,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  Settings,
-  RotateCcw,
-  ArrowDownCircle,
-  Pause
-} from 'lucide-react';
+import { RetirosDirectos, DepositosDirectos, PausarGanancias } from './';
+import { Users, CheckCircle, Users as UsersIcon, HelpCircle, DollarSign, Upload, Package, Menu, X, ChevronLeft, ChevronRight, TrendingUp, Settings, RotateCcw, ArrowDownCircle, ArrowUpCircle, Pause } from 'lucide-react';
 
 interface SuccessModalProps {
   show: boolean;
@@ -183,17 +166,24 @@ const Operaciones: React.FC = () => {
       count: 0,
       description: 'Revertir períodos procesados'
     },
-    { 
-      id: 'retiros', 
-      label: 'Retiros Directos', 
-      icon: ArrowDownCircle, 
+    {
+      id: 'retiros',
+      label: 'Retiros Directos',
+      icon: ArrowDownCircle,
       count: 0,
       description: 'Crear retiros directos a inversores'
     },
-    { 
-      id: 'pausar', 
-      label: 'Pausar Ganancias', 
-      icon: Pause, 
+    {
+      id: 'depositos',
+      label: 'Depósitos Directos',
+      icon: ArrowUpCircle,
+      count: 0,
+      description: 'Crear depósitos directos a inversores'
+    },
+    {
+      id: 'pausar',
+      label: 'Pausar Ganancias',
+      icon: Pause,
       count: 0,
       description: 'Gestionar pausas de ganancias'
     }
@@ -312,6 +302,7 @@ const Operaciones: React.FC = () => {
             {activeTab === 'importexport' && <ImportExportManager onUpdate={fetchStats} />}
             {activeTab === 'rollback' && <RollbackManager onUpdate={fetchStats} />}
             {activeTab === 'retiros' && <RetirosDirectos onUpdate={fetchStats} />}
+            {activeTab === 'depositos' && <DepositosDirectos onUpdate={fetchStats} />}
             {activeTab === 'pausar' && <PausarGanancias onUpdate={fetchStats} />}
           </div>
         </div>

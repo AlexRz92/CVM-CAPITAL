@@ -10,4 +10,5 @@ export { default as TransaccionesManager } from './TransaccionesManager';
 export { default as ModuloAsignaciones } from './ModuloAsignaciones';
 export { default as ModuloGananciasProcessor } from './ModuloGananciasProcessor';
 export { default as RetirosDirectos } from './RetirosDirectos';
+export { default as DepositosDirectos } from './DepositosDirectos';
 export { default as PausarGanancias } from './PausarGanancias';
