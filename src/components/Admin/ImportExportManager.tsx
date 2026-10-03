@@ -438,6 +438,7 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             return {
               ...partner,
               tipo: 'Partner',
+              inversion_inicial: 0,
               deposito: 0,
               retiro: 0,
               ganancia_total: 0,
@@ -445,14 +446,19 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             };
           }
 
-          // Calcular totales por tipo (la inversión inicial se cuenta como depósito)
+          // Calcular totales por tipo
+          let inversion_inicial = 0;
           let deposito = 0;
           let retiro = 0;
           let ganancia_total = 0;
           transacciones?.forEach(t => {
             switch (t.tipo.toLowerCase()) {
               case 'deposito':
-                deposito += Number(t.monto);
+                if (t.descripcion && t.descripcion.includes('Inversión inicial')) {
+                  inversion_inicial += Number(t.monto);
+                } else {
+                  deposito += Number(t.monto);
+                }
                 break;
               case 'retiro':
                 retiro += Number(t.monto);
@@ -462,11 +468,12 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
                 break;
             }
           });
-          // Calcular total de inversión (deposito + ganancia - retiro)
-          const total_inversion = deposito + ganancia_total - retiro;
+          // Calcular total de inversión (inversion_inicial + deposito + ganancia - retiro)
+          const total_inversion = inversion_inicial + deposito + ganancia_total - retiro;
           return {
             ...partner,
             tipo: 'Partner',
+            inversion_inicial,
             deposito,
             retiro,
             ganancia_total,
@@ -476,13 +483,14 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
       );
 
       // Convertir a CSV
-      const headers = ['Nombre', 'Username', 'Tipo', 'Depósito', 'Ganancia Total', 'Retiro', 'Total Inversión'];
+      const headers = ['Nombre', 'Username', 'Tipo', 'Inversión Inicial', 'Depósito', 'Ganancia Total', 'Retiro', 'Total Inversión'];
       const csvContent = [
         headers.join(','),
         ...partnersConTotales.map((row: any) => [
           row.nombre,
           row.username,
           row.tipo,
+          row.inversion_inicial.toFixed(2),
           row.deposito.toFixed(2),
           row.ganancia_total.toFixed(2),
           row.retiro.toFixed(2),
