@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de Inversión — C.V.M Capital</title>
+<style>
+  :root{
+    --azul-oscuro:#1565c0;
+    --azul:#1e88e5;
+    --azul-claro:#42a5f5;
+    --azul-cielo:#64b5f6;
+    --azul-degradado-ini:#2a7fd4;
+    --azul-degradado-fin:#5aa6e8;
+    --texto:#1a2b40;
+    --texto-suave:#5a6b80;
+    --borde:#e2eaf3;
+    --fondo-tarjeta:#ffffff;
+    --verde:#2e9e6b;
+    --sombra:0 10px 30px rgba(21,101,192,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    color:var(--texto);
+    background:#eef4fb;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:0 20px 60px;}
+
+  /* ===== Cabecera ===== */
+  .hero{
+    background:linear-gradient(135deg,var(--azul-degradado-ini) 0%,var(--azul-degradado-fin) 100%);
+    color:#fff;
+    text-align:center;
+    padding:56px 20px 48px;
+    position:relative;
+    overflow:hidden;
+  }
+  .hero::after{
+    content:"";
+    position:absolute;left:0;right:0;bottom:0;height:6px;
+    background:linear-gradient(90deg,var(--azul-oscuro),var(--azul-cielo),var(--azul-oscuro));
+  }
+  .logo-ship{
+    width:90px;height:90px;margin:0 auto 14px;
+    display:flex;align-items:flex-end;justify-content:center;gap:4px;
+  }
+  .logo-ship svg{width:90px;height:72px;}
+  .brand{font-size:30px;font-weight:700;letter-spacing:.5px;}
+  .brand span{font-weight:300;}
+  .slogan{font-style:italic;font-size:16px;opacity:.95;margin-top:6px;}
+  .doc-title{
+    margin-top:26px;font-size:22px;font-weight:600;
+    display:inline-block;padding:8px 26px;border:1px solid rgba(255,255,255,.5);
+    border-radius:40px;backdrop-filter:blur(4px);background:rgba(255,255,255,.08);
+  }
+  .fecha{margin-top:12px;font-size:14px;opacity:.9;}
+
+  /* ===== Resumen tarjetas ===== */
+  .cards{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;margin-top:-34px;position:relative;z-index:2;
+  }
+  .card{
+    background:var(--fondo-tarjeta);border-radius:16px;padding:22px 24px;
+    box-shadow:var(--sombra);border:1px solid var(--borde);
+  }
+  .card .label{font-size:13px;color:var(--texto-suave);text-transform:uppercase;letter-spacing:.6px;}
+  .card .value{font-size:26px;font-weight:700;margin-top:6px;color:var(--azul-oscuro);}
+  .card .value.money{color:var(--verde);}
+  .card.main{
+    background:linear-gradient(135deg,var(--azul-oscuro),var(--azul));color:#fff;border:none;
+  }
+  .card.main .label{color:rgba(255,255,255,.85);}
+  .card.main .value{color:#fff;}
+
+  /* ===== Secciones ===== */
+  section{margin-top:44px;}
+  .sec-head{
+    display:flex;align-items:center;gap:12px;margin-bottom:16px;
+  }
+  .sec-head .dot{width:10px;height:28px;border-radius:4px;background:linear-gradient(var(--azul),var(--azul-oscuro));}
+  .sec-head h2{font-size:21px;color:var(--azul-oscuro);font-weight:700;}
+  .sec-head .count{
+    margin-left:auto;font-size:13px;color:var(--texto-suave);
+    background:#e8f1fb;padding:4px 12px;border-radius:20px;font-weight:600;
+  }
+
+  /* ===== Tablas ===== */
+  .table-card{background:#fff;border-radius:16px;box-shadow:var(--sombra);border:1px solid var(--borde);overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  thead th{
+    background:linear-gradient(135deg,var(--azul-oscuro),var(--azul));
+    color:#fff;text-align:left;padding:14px 18px;font-weight:600;font-size:13px;
+    text-transform:uppercase;letter-spacing:.4px;
+  }
+  thead th.num{text-align:right;}
+  tbody td{padding:12px 18px;border-bottom:1px solid var(--borde);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:nth-child(even){background:#f6faff;}
+  tbody tr:hover{background:#eef5fe;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--azul-oscuro);}
+  td.idx{color:var(--texto-suave);width:46px;text-align:center;font-size:13px;}
+  tfoot td{
+    padding:14px 18px;font-weight:700;background:#eaf3fe;color:var(--azul-oscuro);
+    border-top:2px solid var(--azul-claro);
+  }
+  tfoot td.num{text-align:right;font-size:15px;color:var(--verde);}
+
+  .pill{display:inline-block;padding:2px 10px;border-radius:14px;font-size:12px;font-weight:600;}
+  .pill.p{background:#e3f0ff;color:var(--azul-oscuro);}
+
+  /* ===== Pie ===== */
+  footer{
+    margin-top:48px;text-align:center;color:var(--texto-suave);font-size:13px;
+    padding-top:24px;border-top:1px solid var(--borde);
+  }
+  footer .brand-sm{color:var(--azul-oscuro);font-weight:700;}
+
+  @media print{
+    body{background:#fff;}
+    .card,.table-card{box-shadow:none;}
+    tbody tr:hover{background:transparent;}
+  }
+  @media(max-width:600px){
+    .brand{font-size:24px;}
+    thead th,tbody td,tfoot td{padding:10px 10px;}
+    td.email,th.email{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="logo-ship" aria-hidden="true">
+    <svg viewBox="0 0 120 96" xmlns="http://www.w3.org/2000/svg" fill="#ffffff">
+      <!-- edificios -->
+      <rect x="6"  y="40" width="12" height="48"/>
+      <rect x="22" y="26" width="12" height="62"/>
+      <rect x="86" y="26" width="12" height="62"/>
+      <rect x="102" y="40" width="12" height="48"/>
+      <!-- velas del barco -->
+      <path d="M60 6 L60 60 L40 60 Z"/>
+      <path d="M64 14 L64 60 L84 60 Z"/>
+      <!-- casco -->
+      <path d="M34 66 L92 66 L84 82 L42 82 Z"/>
+    </svg>
+  </div>
+  <div class="brand">C.V.M <span>Capital</span></div>
+  <div class="slogan">Inversión Inteligente, siempre con ustedes</div>
+  <div class="doc-title">Informe de Inversión</div>
+  <div class="fecha">Generado el 3 de octubre de 2026</div>
+</header>
+
+<div class="wrap">
+
+  <!-- Resumen -->
+  <div class="cards">
+    <div class="card main">
+      <div class="label">Capital total gestionado</div>
+      <div class="value">$476,992.54</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Inversores</div>
+      <div class="value">$177,059.81</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Partners</div>
+      <div class="value">$299,932.73</div>
+    </div>
+    <div class="card">
+      <div class="label">Participantes</div>
+      <div class="value">54</div>
+    </div>
+  </div>
+
+  <!-- Partners -->
+  <section>
+    <div class="sec-head">
+      <span class="dot"></span>
+      <h2>Partners</h2>
+      <span class="count">3 registros</span>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th class="idx">#</th>
+            <th>Nombre</th>
+            <th>Apellido</th>
+            <th>Tipo</th>
+            <th class="num">Total Inversión</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="idx">1</td><td>Andres</td><td>Miquilena</td><td><span class="pill p">Partner</span></td><td class="num">$181,520.95</td></tr>
+          <tr><td class="idx">2</td><td>Alexis</td><td>Ruiz</td><td><span class="pill p">Partner</span></td><td class="num">$85,552.58</td></tr>
+          <tr><td class="idx">3</td><td>CVM</td><td>—</td><td><span class="pill p">Partner</span></td><td class="num">$32,859.20</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="4">Total Partners</td><td class="num">$299,932.73</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <!-- Inversores -->
+  <section>
+    <div class="sec-head">
+      <span class="dot"></span>
+      <h2>Inversores</h2>
+      <span class="count">51 registros</span>
+    </div>
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th class="idx">#</th>
+            <th>Nombre</th>
+            <th>Apellido</th>
+            <th class="email">Email</th>
+            <th class="num">Total Inversión</th>
+          </tr>
+        </thead>
+        <tbody id="inv-body"><!-- filas generadas --></tbody>
+        <tfoot>
+          <tr><td colspan="4">Total Inversores</td><td class="num">$177,059.81</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div class="brand-sm">C.V.M Capital</div>
+    <div>Inversión Inteligente, siempre con ustedes</div>
+    <div style="margin-top:8px;">Informe confidencial · Uso interno · 3 de octubre de 2026</div>
+  </footer>
+
+</div>
+
+<script>
+  // Datos de inversores (ordenados de mayor a menor total)
+  const inversores = [
+    ["Jose","Rancier","jrancier92@gmail.com",62923.22],
+    ["Sonia","Villar","soniavillar05@gmail.com",38864.91],
+    ["Vanessa","Villarroel","abg.vanessavillarroel@gmail.com",7715.84],
+    ["Nereyda","Peci","housainabdedine@gmail.com",6487.32],
+    ["Wilson","Jasmin","wilsonbastienjasmin@gmail.com",6150.01],
+    ["Wancalot","Jasmin","wancalotjasmin@gmail.com",4803.01],
+    ["José","Javier","cmv.feeble991@slmails.com",4502.91],
+    ["Lorena","Sequera","vvvv.island@gmail.com",4051.57],
+    ["Arthur","Lasso","ar_lama@hotmail.com",3949.75],
+    ["Marianys","Cordero","maria24nys@gmail.com",3673.80],
+    ["Gregory","Ruiz","gregory.arturo.ruiz@gmail.com",3062.95],
+    ["Simon","Ruiz","ruizsimon07@gmail.com",3060.29],
+    ["Nerio","Pina","neriop@gmail.com",3005.06],
+    ["Maria","Medina","rahmariale@gmail.com",2615.84],
+    ["Leonard","Ruiz","leonardr@gmail.com",2137.08],
+    ["Andres","Gonzalez","afmaturana07@hotmail.com",1541.29],
+    ["Betania","F","betaniaf@gmail.com",1478.85],
+    ["Emmily","Maduro","emaduro2307@gmail.com",1413.50],
+    ["Alejandro","Dager","cryptoale58@gmail.com",1311.68],
+    ["Aarón","Rosendo","aaronr@gmail.com",1210.24],
+    ["Esthefany","Oropeza","sdvoropeza@gmail.com",944.29],
+    ["Arturo","Villarroel","vajocoins@gmail.com",940.14],
+    ["Ángel","David","angeldrosendo@gmail.com",928.47],
+    ["Joan","Villegas","jvillegascastells@gmail.com",748.23],
+    ["Betania","Piña","betaminaa@gmail.com",646.16],
+    ["Daniel","Valdivieso","divaldivieso1@icloud.com",604.99],
+    ["Francisco","Ramirez","franramirez1101@gmail.com",603.28],
+    ["Alysmaidy","Garcia","maidy19gs@gmail.com",589.20],
+    ["Javier","Gutiérrez","javierisac03@gmail.com",569.79],
+    ["Mabel","Martínez","mabelmartinezp@gmail.com",513.71],
+    ["Marleidys","Herrera","marleidys726@gmail.com",490.23],
+    ["Cristian","Cabe","ats.zerac@gmail.com",456.00],
+    ["Mario","Cordero","marioluiscordero1998@gmail.com",452.49],
+    ["Anuar","Nicolas","anuarhabibn12@gmail.com",452.00],
+    ["Elida","Rojas","elidar@gmail.com",439.36],
+    ["Victor","Torres","victorgabriel2004@gmail.com",434.86],
+    ["Dominic","Rojo","cosmicdominic@protonmail.com",374.27],
+    ["Orlanys","Martínez","orlanysmartinez@gmail.com",373.44],
+    ["Giacomo","Giovane","ggiovane.af@gmail.com",363.67],
+    ["Yuvanna","Costero","yuvannam27@gmail.com",343.22],
+    ["Marian","Pérez","mjoppeci@gmail.com",286.44],
+    ["Guirvin","González","guirvingonzalez@gmail.com",286.27],
+    ["María","Martínez","mariama@gmail.com",255.92],
+    ["Javier","Martínez","martinezpeci4@gmail.com",251.41],
+    ["Angel","Antonio","angelrosendon24@gmail.com",244.91],
+    ["Daniela","Hernández","danielahdb0108@gmail.com",205.42],
+    ["Hector","Noguera","noguerahector2@gmail.com",162.34],
+    ["Jose","Sayegle","web3poke@gmail.com",100.00],
+    ["Jose","Alchaer","josealchaer92@gmail.com",21.33],
+    ["Eduardo","Villarroel","eduardovillarroele35@gmail.com",17.06],
+    ["Elías","Dager","eliasdagergabaldon@gmail.com",1.79]
+  ];
+
+  const fmt = n => "$" + n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const body = document.getElementById("inv-body");
+  inversores.forEach((inv,i)=>{
+    const [nombre,apellido,email,total] = inv;
+    body.insertAdjacentHTML("beforeend",
+      `<tr>
+        <td class="idx">${i+1}</td>
+        <td>${nombre}</td>
+        <td>${apellido||"—"}</td>
+        <td class="email">${email}</td>
+        <td class="num">${fmt(total)}</td>
+      </tr>`);
+  });
+</script>
+
+</body>
+</html>
