@@ -358,38 +358,18 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         })
       );
 
-      // Convertir a CSV con el formato solicitado
+      // Convertir a CSV con el formato solicitado (solo nombre, apellido y total)
       const headers = [
         'Nombre', 
         'Apellido', 
-        'Email', 
-        'País', 
-        'Telegram', 
-        'Depósito', 
-        'Ganancia Total', 
-        'Retiro', 
-        'Total Inversión', 
-        'Beneficiario Nombre', 
-        'Beneficiario Apellido', 
-        'Beneficiario Teléfono', 
-        'Beneficiario Email'
+        'Total Inversión'
       ];
       const csvContent = [
         headers.join(','),
         ...inversoresConTotales.map((row: any) => [
           row.nombre || '',
           row.apellido || '',
-          row.email || '',
-          row.pais || '',
-          row.telegram_username || '',
-          row.deposito.toFixed(2),
-          row.ganancia_total.toFixed(2),
-          row.retiro.toFixed(2),
-          row.total_inversion.toFixed(2),
-          row.beneficiario_nombre || '',
-          row.beneficiario_apellido || '',
-          row.beneficiario_telefono || '',
-          row.beneficiario_email || ''
+          row.total_inversion.toFixed(2)
         ].join(','))
       ].join('\n');
       // Descargar archivo
@@ -397,7 +377,7 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `inversores_completo_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `inversores_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -482,20 +462,23 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         })
       );
 
-      // Convertir a CSV
-      const headers = ['Nombre', 'Username', 'Tipo', 'Inversión Inicial', 'Depósito', 'Ganancia Total', 'Retiro', 'Total Inversión'];
+      // Convertir a CSV (solo nombre, apellido y total)
+      const headers = ['Nombre', 'Apellido', 'Total Inversión'];
       const csvContent = [
         headers.join(','),
-        ...partnersConTotales.map((row: any) => [
-          row.nombre,
-          row.username,
-          row.tipo,
-          row.inversion_inicial.toFixed(2),
-          row.deposito.toFixed(2),
-          row.ganancia_total.toFixed(2),
-          row.retiro.toFixed(2),
-          row.total_inversion.toFixed(2)
-        ].join(','))
+        ...partnersConTotales.map((row: any) => {
+          // La tabla partners solo tiene "nombre" (nombre completo):
+          // la primera palabra es el nombre y el resto el apellido.
+          const nombreCompleto = (row.nombre || '').trim();
+          const partes = nombreCompleto.split(/\s+/);
+          const nombre = partes.shift() || '';
+          const apellido = partes.join(' ');
+          return [
+            nombre,
+            apellido,
+            row.total_inversion.toFixed(2)
+          ].join(',');
+        })
       ].join('\n');
       // Descargar archivo
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
