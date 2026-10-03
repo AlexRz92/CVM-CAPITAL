@@ -406,32 +406,35 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
       // Para cada partner, calcular sus totales desde transacciones
       const partnersConTotales = await Promise.all(
         (partners || []).map(async (partner) => {
-          // Obtener transacciones del partner
-          const { data: transacciones, error: transError } = await supabase
+          // Obtener transacciones principales del partner
+          const { data: transaccionesPrincipales, error: errorPrincipal } = await supabase
             .from('transacciones')
             .select('monto, tipo, descripcion')
             .eq('partner_id', partner.id)
             .eq('usuario_tipo', 'partner');
 
-          if (transError) {
-            console.error('Error fetching transactions for partner:', partner.id, transError);
-            return {
-              ...partner,
-              tipo: 'Partner',
-              inversion_inicial: 0,
-              deposito: 0,
-              retiro: 0,
-              ganancia_total: 0,
-              total_inversion: 0
-            };
+          if (errorPrincipal) {
+            console.error('Error fetching principal transactions for partner:', partner.id, errorPrincipal);
           }
 
-          // Calcular totales por tipo
+          // Obtener transacciones de módulos del partner
+          const { data: transaccionesModulos, error: errorModulos } = await supabase
+            .from('modulo_transacciones')
+            .select('monto, tipo, descripcion')
+            .eq('partner_id', partner.id)
+            .eq('usuario_tipo', 'partner');
+
+          if (errorModulos) {
+            console.error('Error fetching module transactions for partner:', partner.id, errorModulos);
+          }
+
+          // Calcular totales por tipo (principales + módulos)
           let inversion_inicial = 0;
           let deposito = 0;
           let retiro = 0;
           let ganancia_total = 0;
-          transacciones?.forEach(t => {
+
+          const procesarTransaccion = (t: any) => {
             switch (t.tipo.toLowerCase()) {
               case 'deposito':
                 if (t.descripcion && t.descripcion.includes('Inversión inicial')) {
@@ -447,7 +450,11 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
                 ganancia_total += Number(t.monto);
                 break;
             }
-          });
+          };
+
+          transaccionesPrincipales?.forEach(procesarTransaccion);
+          transaccionesModulos?.forEach(procesarTransaccion);
+
           // Calcular total de inversión (inversion_inicial + deposito + ganancia - retiro)
           const total_inversion = inversion_inicial + deposito + ganancia_total - retiro;
           return {
