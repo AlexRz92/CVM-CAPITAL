@@ -346,12 +346,14 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             }
           });
 
-          // Calcular saldo actual (deposito + ganancia - retiro)
-          const saldo_actual = deposito + ganancia_total - retiro;
+          // Calcular total de inversión (deposito + ganancia - retiro)
+          const total_inversion = deposito + ganancia_total - retiro;
           return {
             ...inversor,
-            deposito: saldo_actual, // Saldo actual como "depósito" para el CSV
-            saldo_actual
+            deposito,
+            retiro,
+            ganancia_total,
+            total_inversion
           };
         })
       );
@@ -363,7 +365,10 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
         'Email', 
         'País', 
         'Telegram', 
-        'Deposito', 
+        'Depósito', 
+        'Ganancia Total', 
+        'Retiro', 
+        'Total Inversión', 
         'Beneficiario Nombre', 
         'Beneficiario Apellido', 
         'Beneficiario Teléfono', 
@@ -377,7 +382,10 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
           row.email || '',
           row.pais || '',
           row.telegram_username || '',
-          row.saldo_actual.toFixed(2),
+          row.deposito.toFixed(2),
+          row.ganancia_total.toFixed(2),
+          row.retiro.toFixed(2),
+          row.total_inversion.toFixed(2),
           row.beneficiario_nombre || '',
           row.beneficiario_apellido || '',
           row.beneficiario_telefono || '',
@@ -430,27 +438,21 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
             return {
               ...partner,
               tipo: 'Partner',
-              inversion_inicial: 0,
               deposito: 0,
               retiro: 0,
               ganancia_total: 0,
-              saldo_actual: 0
+              total_inversion: 0
             };
           }
 
-          // Calcular totales por tipo
-          let inversion_inicial = 0;
+          // Calcular totales por tipo (la inversión inicial se cuenta como depósito)
           let deposito = 0;
           let retiro = 0;
           let ganancia_total = 0;
           transacciones?.forEach(t => {
             switch (t.tipo.toLowerCase()) {
               case 'deposito':
-                if (t.descripcion && t.descripcion.includes('Inversión inicial')) {
-                  inversion_inicial += Number(t.monto);
-                } else {
-                  deposito += Number(t.monto);
-                }
+                deposito += Number(t.monto);
                 break;
               case 'retiro':
                 retiro += Number(t.monto);
@@ -460,33 +462,31 @@ const ImportExportManager: React.FC<ImportExportManagerProps> = ({ onUpdate }) =
                 break;
             }
           });
-          // Calcular saldo actual
-          const saldo_actual = inversion_inicial + deposito + ganancia_total - retiro;
+          // Calcular total de inversión (deposito + ganancia - retiro)
+          const total_inversion = deposito + ganancia_total - retiro;
           return {
             ...partner,
             tipo: 'Partner',
-            inversion_inicial,
             deposito,
             retiro,
             ganancia_total,
-            saldo_actual
+            total_inversion
           };
         })
       );
 
       // Convertir a CSV
-      const headers = ['Nombre', 'Username', 'Tipo', 'Inversión Inicial', 'Depósito', 'Retiro', 'Ganancia Total', 'Saldo Actual'];
+      const headers = ['Nombre', 'Username', 'Tipo', 'Depósito', 'Ganancia Total', 'Retiro', 'Total Inversión'];
       const csvContent = [
         headers.join(','),
         ...partnersConTotales.map((row: any) => [
           row.nombre,
           row.username,
           row.tipo,
-          row.inversion_inicial.toFixed(2),
           row.deposito.toFixed(2),
-          row.retiro.toFixed(2),
           row.ganancia_total.toFixed(2),
-          row.saldo_actual.toFixed(2)
+          row.retiro.toFixed(2),
+          row.total_inversion.toFixed(2)
         ].join(','))
       ].join('\n');
       // Descargar archivo
